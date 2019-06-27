@@ -1,0 +1,98 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dataset-transformation-<DATASET_ID>
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: configmap-creator
+      imagePullSecrets:
+        - name: docker-creds
+      initContainers:
+        - name: download-dataset
+          image: python:3.7.3
+          imagePullPolicy: Always
+          env:
+            - name: KAGGLE_CONFIG_DIR
+              value: "/certs"
+            - name: KAGGLE_SRC
+              value: "<KAGGLE_SRC>"
+          volumeMounts:
+            - mountPath: "/certs"
+              name: certs
+              readOnly: true
+            - mountPath: "/transfer"
+              name: transfer
+          command:
+            - sh
+            - -c
+            - |
+              pip install kaggle
+
+              cd /transfer
+
+              kaggle <KAGGLE_API_TYPE> download $KAGGLE_SRC
+
+              unzip '*.zip'
+
+              echo "Current contents:"
+              ls -l
+              pwd
+        - name: transform-dataset
+          image: gcr.io/<GCLOUD_PROJECT>/main:<TAG>
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: "/transfer"
+              name: transfer
+            - mountPath: "/output"
+              name: transformed
+          command:
+            - sh
+            - -c
+            - |
+              echo "derp"
+              python -u transform_<DATASET_ID>.py --dataset-path /transfer/<DATASET_NAME> \
+                --dataset-id <DATASET_ID> \
+                --output-dir "/output" \
+                --output-file "transformed.csv"
+        - name: publish-dataset
+          image: google/cloud-sdk:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: "/certs"
+              name: gcloud-certs
+              readOnly: true
+            - mountPath: "/output"
+              name: transformed
+          command:
+            - sh
+            - -c
+            - |
+              gcloud auth activate-service-account --key-file=/certs/svc_account.json
+
+              gsutil cp /output/* "<GCLOUD_DATASET_BUCKET>/<DATASET_ID>/dataset_creation/transformed/"
+      containers:
+        - name: config-map-publisher
+          image: lachlanevenson/k8s-kubectl:v1.14.2
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -c
+            - |
+              kubectl create cm transformed-<DATASET_ID>-cm --from-literal data=derp
+      restartPolicy: Never
+      volumes:
+        - name: certs
+          secret:
+            secretName: kaggle-creds
+        - name: gcloud-certs
+          secret:
+            secretName: gcloud-creds
+        - name: transfer
+          emptyDir: {}
+        - name: transformed
+          emptyDir: {}
+        - name: output
+          emptyDir: {}

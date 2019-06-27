@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: transformed-mnist-cm
+data:
+  data: "derp"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dataset-creation-<DATASET_ID_LOWER>-<SIZE>
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      imagePullSecrets:
+        - name: docker-creds
+      initContainers:
+        - name: download-dataset
+          image: google/cloud-sdk:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: "/transformed_cm"
+              name: transformed
+            - mountPath: "/certs"
+              name: gcloud-certs
+              readOnly: true
+            - mountPath: "/transfer"
+              name: transfer
+          command:
+            - sh
+            - -c
+            - |
+              gcloud auth activate-service-account --key-file=/certs/svc_account.json
+
+              if [ -z "<DOWNLOAD_TRANSFORMED>" ]; then
+                echo "Determined that we do not need to download the transformed dataset. Doing nothing"
+              else
+                gsutil cp "<GCLOUD_DATASET_BUCKET>/<DATASET_ID>/dataset_creation/transformed/transformed.csv" <DATASET_PATH>
+              fi
+        - name: process-dataset
+          image: gcr.io/<GCLOUD_PROJECT>/main:<TAG>
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: "/transfer"
+              name: transfer
+            - mountPath: "/output"
+              name: output
+          command:
+            - sh
+            - -c
+            - |
+              python -u process.py --dataset-path <DATASET_PATH> \
+                --dataset-id <DATASET_ID> \
+                --is-categorical "<IS_CATEGORICAL>" \
+                --split-key <SPLIT_KEY> \
+                --target <TARGET> \
+                --cols-to-drop "<COLS_TO_DROP>" \
+                --val-train-val-test "<VAL_TRAIN_VAL_TEST>" \
+                --output-dir "/output" \
+                --unique-image-tag "<TAG>"
+      containers:
+        - name: publish-dataset
+          image: google/cloud-sdk:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: "/certs"
+              name: gcloud-certs
+              readOnly: true
+            - mountPath: "/output"
+              name: output
+          command:
+            - sh
+            - -c
+            - |
+              gcloud auth activate-service-account --key-file=/certs/svc_account.json
+
+              gsutil cp /output/* "<GCLOUD_DATASET_BUCKET>/<DATASET_ID>/dataset_creation/created/"
+      restartPolicy: Never
+      volumes:
+        - name: certs
+          secret:
+            secretName: kaggle-creds
+        - name: gcloud-certs
+          secret:
+            secretName: gcloud-creds
+        - name: transfer
+          emptyDir: {}
+        - name: output
+          emptyDir: {}
+          # This configMap is created by the dataset_tranformation job. Thus,
+          # mounting this configMap here allows this job to wait to start running
+          # until the dataset transformation has finished
+        - name: transformed
+          configMap:
+            name: transformed-<DATASET_ID_LOWER>-cm
