@@ -1,0 +1,190 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dummy-mixtures-and-budgets-cm
+  namespace: kubeflow
+data:
+  gcloud_dst: ""
+---
+apiVersion: "kubeflow.org/v1alpha1"
+kind: StudyJob
+metadata:
+  namespace: kubeflow
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: experiment-running-<DATASET_ID_LOWER>-<SIZE>-<EXPERIMENT_TYPE>-<DATE>
+spec:
+  studyName: experiment-running-<DATASET_ID_LOWER>-<SIZE>-<EXPERIMENT_TYPE>-<DATE>
+  owner: crd
+  optimizationtype: minimize
+  objectivevaluename: best_sol_val_avg
+  optimizationgoal: <OPT_GOAL>
+  requestcount: 12
+  metricsnames:
+    - best_sol_val_iter_1
+    - best_sol_val_avg
+    - best_sol_val_std
+    - l1_dist_iter_1
+    - l1_dist_avg
+    - l1_dist_std
+    - execution_time_avg
+    - total_cost_iter_1
+    - actual_cost_avg
+    - actual_cost_std
+    - eval_root_cost
+    - remaining_budget
+    - eval_child_cost
+    - doo_tree_eval_execution_time
+    - best_node_height
+    - best_node_value
+    - num_inner_layers
+  parameterconfigs:
+    - name: --batch-size
+      parametertype: int
+      feasible:
+        min: "20"
+        max: "100"
+    - name: --eta
+      parametertype: double
+      feasible:
+        min: "0.0001"
+        max: "0.01"
+  workerSpec:
+    goTemplate:
+      rawTemplate: |-
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: {{.WorkerID}}
+          namespace: kubeflow
+          labels:
+            app: experiment-running-<DATASET_ID_LOWER>-<EXPERIMENT_TYPE>
+        spec:
+          backoffLimit: 2
+          template:
+            spec:
+              initContainers:
+                - name: download-dataset
+                  image: google/cloud-sdk:latest
+                  imagePullPolicy: Always
+                  volumeMounts:
+                    - mountPath: "/transfer"
+                      name: transfer
+                    - mountPath: "/mixtures_and_budgets_cm"
+                      name: actual-mixtures-and-budgets
+                  command:
+                    - sh
+                    - -c
+                    - |
+                      gsutil cp "<GCLOUD_DATASET_BUCKET>/<DATASET_ID>/dataset_creation/created/<DATASET_FILENAME>" /transfer/dataset.p
+                      if [ -z "$(cat /mixtures_and_budgets_cm/gcloud_dst)" ]; then
+                        echo "Determined that there is no mixtures and budgets to use"
+                      else
+                        MIXTURES_AND_BUDGETS=$(cat /mixtures_and_budgets_cm/gcloud_dst)
+                        echo "Determined that mixtures and budgets file can be found: ${MIXTURES_AND_BUDGETS}"
+                        gsutil cp ${MIXTURES_AND_BUDGETS} /transfer/mixtures_and_budgets.p
+                      fi
+              containers:
+                - name: process-dataset
+                  image: gcr.io/<GCLOUD_PROJECT>/main:<TAG>
+                  imagePullPolicy: Always
+                  resources:
+                    requests:
+                      cpu: "100m"
+                      memory: "500Mi"
+                    limits:
+                      cpu: "100m"
+                      memory: "750Mi"
+                  volumeMounts:
+                    - mountPath: "/transfer"
+                      name: transfer
+                    - mountPath: "/output"
+                      name: output
+                    - mountPath: "/outlogs"
+                      name: outlogs
+                  command:
+                    - sh
+                    - -c
+                    - |
+                      python -u run_single_experiment.py \
+                        --dataset-path /transfer/dataset.p \
+                        --dataset-id <DATASET_ID> \
+                        --tag <TAG> \
+                        --actual-budgets-and-mixtures-path "$(ls -d /transfer/* | grep mixtures_and_budgets)" \
+                        --experiment-type <EXPERIMENT_TYPE> \
+                        --budget-min <BUDGET_MIN> \
+                        --budget-max <BUDGET_MAX> \
+                        --budget-step <BUDGET_STEP> \
+                        --num-repeats <NUM_REPEATS> \
+                        --columns-to-censor "<COLUMNS_TO_CENSOR>" \
+                        --inner-layer-mult <INNER_LAYER_MULT> \
+                        --optimization-budget constant \
+                        --optimization-budget-multiplier 1 \
+                        --optimization-budget-height-cap inf \
+                        --nu 1 \
+                        --rho 0.8 \
+                        --return-best-deepest-node True \
+                        --mixture-selection-strategy coordinate-halving \
+                        {{- with .HyperParameters}}
+                        {{- range .}}
+                        {{.Name}} "{{.Value}}" \
+                        {{- end}}
+                        {{- end}}
+                        --output-dir "/output" |\
+                        tee /outlogs/run_single_experiment.out
+              restartPolicy: Never
+              volumes:
+                - name: gcloud-certs
+                  secret:
+                    secretName: gcloud-creds
+                - name: transfer
+                  emptyDir: {}
+                - name: output
+                  emptyDir: {}
+                - name: outlogs
+                  emptyDir: {}
+                - name: actual-mixtures-and-budgets
+                  configMap:
+                    name: <ACTUAL_MIXTURES_AND_BUDGETS_CM>
+  suggestionSpec:
+    suggestionAlgorithm: "random"
+    requestNumber: 24
+  metricscollectorspec:
+    goTemplate:
+      rawTemplate: |
+        apiVersion: batch/v1beta1
+        kind: CronJob
+        metadata:
+          name: {{.WorkerID}}
+          namespace: {{.NameSpace}}
+        spec:
+          schedule: "*/5 * * * *"
+          successfulJobsHistoryLimit: 0
+          failedJobsHistoryLimit: 0
+          concurrencyPolicy: Forbid
+          jobTemplate:
+            spec:
+              backoffLimit: 0
+              template:
+                spec:
+                  serviceAccountName: metrics-collector
+                  containers:
+                  - name: {{.WorkerID}}
+                    image: gcr.io/kubeflow-images-public/katib/metrics-collector:v0.1.2-alpha-156-g4ab3dbd
+                    args:
+                    - "./metricscollector"
+                    - "-s"
+                    - "{{.StudyID}}"
+                    - "-t"
+                    - "{{.TrialID}}"
+                    - "-w"
+                    - "{{.WorkerID}}"
+                    - "-k"
+                    - "{{.WorkerKind}}"
+                    - "-n"
+                    - "{{.NameSpace}}"
+                    - "-m"
+                    - "{{.ManagerSerivce}}"
+                  restartPolicy: Never
+
+

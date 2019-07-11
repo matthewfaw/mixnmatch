@@ -73,9 +73,6 @@ class MFFunction:
                                   batch_size=self.test_batch_size,
                                   shuffle=False)
 
-    def get_cost(self, eval_number):
-        return self.optimization_strategy.get_num_steps(eval_number)
-
     def get_validation_error(self, model):
         return self._get_error(model, self.validation_dataset, self.validation_dl, self.validation_fn)
 
@@ -94,13 +91,14 @@ class MFFunction:
                 err += eval_fn(preds, label) * (len_batch / len_dataset)
         return err
 
-    def fn(self, starting_point, mixture, opt_budget):
+    def fn(self, starting_point, mixture, opt_budget, eta_mult):
         dl = self.data_loader_factory.get_data_loader(mixture, opt_budget)
         # Optimize the loss function
         ending_model = self.optimization_strategy \
             .optimize(self.loss_fn,
                       starting_point,
-                      dl)
+                      dl,
+                      eta_mult)
 
         if self.use_test_error:
             err = self.get_test_error(ending_model)

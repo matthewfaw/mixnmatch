@@ -13,6 +13,7 @@ metadata:
     actual-mixtures-and-budgets: "<ACTUAL_MIXTURES_AND_BUDGETS_CM>"
     cm-to-publish: "<CM_TO_PUBLISH>"
     cols-to-censor: "<COLUMNS_TO_CENSOR>"
+    custom-mixture: "<CUSTOM_MIXTURE>"
   labels:
     app: experiment-running
     dataset: "<DATASET_ID_LOWER>"
@@ -31,11 +32,15 @@ metadata:
     nu: "<NU>"
     rho: "<RHO>"
     eta: "<ETA>"
+    eta-decay-step: "<ETA_DECAY_STEP>"
+    eta-decay-mult: "<ETA_DECAY_MULT>"
     return-best-deepest: "<RETURN_BEST_DEEPEST_NODE>"
     mixture-selection-strategy: "<MIXTURE_SELECTION_STRATEGY>"
     record-test-error: "<RECORD_TEST_ERROR>"
     size: "<SIZE>"
     group-with: "<GROUP_WITH>"
+    evaluate-best-result-again: "<EVALUATE_BEST_RESULT_AGAIN>"
+    evaluate-best-result-again-eta-mult: "<EVALUATE_BEST_RESULT_AGAIN_ETA_MULT>"
 spec:
   backoffLimit: 2
   template:
@@ -105,12 +110,17 @@ spec:
                 --nu <NU> \
                 --rho <RHO> \
                 --eta <ETA> \
+                --eta-decay-step <ETA_DECAY_STEP> \
+                --eta-decay-mult <ETA_DECAY_MULT> \
                 --return-best-deepest-node "<RETURN_BEST_DEEPEST_NODE>" \
                 --mixture-selection-strategy <MIXTURE_SELECTION_STRATEGY> \
+                --custom-mixture "<CUSTOM_MIXTURE>" \
                 --columns-to-censor "<COLUMNS_TO_CENSOR>" \
                 --output-dir "/output" \
                 --record-test-error "<RECORD_TEST_ERROR>" \
-                --inner-layer-mult "<INNER_LAYER_MULT>"
+                --inner-layer-mult "<INNER_LAYER_MULT>" \
+                --evaluate-best-result-again "<EVALUATE_BEST_RESULT_AGAIN>" \
+                --evaluate-best-result-again-eta-mult "<EVALUATE_BEST_RESULT_AGAIN_ETA_MULT>"
         - name: publish-dataset
           image: google/cloud-sdk:latest
           imagePullPolicy: Always

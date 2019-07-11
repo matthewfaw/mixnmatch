@@ -13,6 +13,7 @@ if [[ -z "$GCLOUD_DATASET_BUCKET" ]]; then
 else
     echo "Using Gcloud project: $GCLOUD_DATASET_BUCKET"
 fi
+
 KAGGLE_SRC=allstate-purchase-prediction-challenge
 KAGGLE_API_TYPE=competitions
 DATASET_ID=allstate

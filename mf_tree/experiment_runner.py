@@ -1,11 +1,11 @@
 from mf_tree.eval_fns_torch import MFFunction, RBFKernelFn
 from mf_tree.node_torch import MFNode
-from mf_tree.tree_evaluator import DOOTreeEvaluator
+from mf_tree.tree_evaluator import DOOTreeEvaluator, ExtendedRunsDOOTreeEvaluator
 from datasets.pandas_dataset import PandasData, PandasDataset
 from datasets.torch_dataset import TorchData, TorchDataset
 from datasets.data_loaders import DataLoaderFactory, MMDDataLoaderFactory
 from mf_tree.optimization_strategies import SGDTorchOptimizationStrategy
-from mf_tree.optimization_budgets import ConstantBudgetFn, LinearBudgetFn, HeightDependentBudgetFn, ConstUntilHeightBudgetFn
+from mf_tree.optimization_budgets import ConstantBudgetFn, SqrtBudgetFn, LinearBudgetFn, HeightDependentBudgetFn, ConstUntilHeightBudgetFn
 from mf_tree.step_schedules import SimpleTorchStepSchedule
 from mf_tree.simplex_partitioning_strategies import DelaunayPartitioningStrategy, ConstantPartitioningStrategy, CoordinateHalvingPartitioningStrategy
 from datasets.censor import DataCensorer
@@ -50,11 +50,17 @@ class ExperimentSettings:
                  nu,
                  rho,
                  eta,
+                 eta_decay_step,
+                 eta_decay_mult,
                  batch_size,
                  plot_fmt,
                  mixture_selection_strategy,
+                 custom_mixture,
+                 evaluate_best_result_again,
+                 evaluate_best_result_again_eta_mult,
                  actual_budgets,
                  actual_mixtures,
+                 actual_best_sols,
                  record_test_error):
         self.experiment_type=experiment_type
         self.experiment_budgets=experiment_budgets
@@ -73,11 +79,17 @@ class ExperimentSettings:
         self.nu=nu
         self.rho=rho
         self.eta=eta
+        self.eta_decay_step=eta_decay_step
+        self.eta_decay_mult=eta_decay_mult
         self.batch_size=batch_size
         self.plot_fmt = plot_fmt
         self.mixture_selection_strategy = mixture_selection_strategy
+        self.custom_mixture = custom_mixture
+        self.evaluate_best_result_again = evaluate_best_result_again
+        self.evaluate_best_result_again_eta_mult = evaluate_best_result_again_eta_mult
         self.actual_budgets = actual_budgets
         self.actual_mixtures = actual_mixtures
+        self.actual_best_sols = actual_best_sols
         self.record_test_error = record_test_error
 
     def __repr__(self):
@@ -97,11 +109,16 @@ class ExperimentSettings:
                "nu:%s\n" \
                "rho:%s\n" \
                "eta:%s\n" \
+               "eta_decay_step:%s\n" \
+               "eta_decay_mult:%s\n" \
                "batch size:%s\n" \
                "plot_fmt:%s\n" \
                "mixture selection strategy:%s\n" \
+               "custom mixture:%s\n" \
+               "evaluate best result again:%s\n" \
                "actual budgets:%s\n" \
                "actual mixtures:%s\n" \
+               "actual best sols:%s\n" \
                "record test error:%s\n" % (self.experiment_type,
                                            self.experiment_budgets,
                                            self.return_best_deepest_node,
@@ -118,11 +135,16 @@ class ExperimentSettings:
                                            self.nu,
                                            self.rho,
                                            self.eta,
+                                           self.eta_decay_step,
+                                           self.eta_decay_mult,
                                            self.batch_size,
                                            self.plot_fmt,
                                            self.mixture_selection_strategy,
+                                           self.custom_mixture,
+                                           self.evaluate_best_result_again,
                                            self.actual_budgets,
                                            self.actual_mixtures,
+                                           self.actual_best_sols,
                                            self.record_test_error)
 
 
@@ -155,7 +177,7 @@ class RepeatedExperimentResults:
         actual_cost_avg = np.average(total_costs)
         actual_cost_std = np.std(total_costs)
         print("actual_cost_avg={}".format(actual_cost_avg))
-        print("actual_cost_std={}".format(actual_cost_avg))
+        print("actual_cost_std={}".format(actual_cost_std))
         self.actual_costs_all.append(total_costs)
         self.best_sols_all.append(best_sols)
         self.final_mixtures_all.append(final_mixtures)
@@ -262,6 +284,8 @@ class DefaultExperimentConfigurer:
             opt_budget_class = ConstUntilHeightBudgetFn
         elif "linear" == experiment_settings.optimization_budget_type:
             opt_budget_class = LinearBudgetFn
+        elif "sqrt" == experiment_settings.optimization_budget_type:
+            opt_budget_class = SqrtBudgetFn
         elif "height" == experiment_settings.optimization_budget_type:
             opt_budget_class = HeightDependentBudgetFn
         elif "constant" == experiment_settings.optimization_budget_type:
@@ -272,6 +296,12 @@ class DefaultExperimentConfigurer:
 
         alt_budgets_to_use = experiment_settings.actual_budgets
 
+
+        # Set starting points and step sizes
+        if experiment_settings.mixture_selection_strategy == "tree-results":
+            alt_starting_point_nodes = experiment_settings.actual_best_sols
+        else:
+            alt_starting_point_nodes = None
 
         # Set partitioning strategies
         if experiment_settings.mixture_selection_strategy == "delaunay-partitioning":
@@ -287,6 +317,8 @@ class DefaultExperimentConfigurer:
                 partitioning_strategy.append([ConstantPartitioningStrategy(dim=self.alpha_dim, simplex_point=mix) for mix in mixtures])
         elif experiment_settings.mixture_selection_strategy == "uniform":
             partitioning_strategy = ConstantPartitioningStrategy(dim=self.alpha_dim)
+        elif experiment_settings.mixture_selection_strategy == "custom":
+            partitioning_strategy = ConstantPartitioningStrategy(dim=self.alpha_dim, simplex_point=experiment_settings.custom_mixture)
         else:
             print("Invalid mixture selection strategy:", experiment_settings.mixture_selection_strategy)
             assert False
@@ -297,7 +329,9 @@ class DefaultExperimentConfigurer:
                                                 nu=experiment_settings.nu,
                                                 rho=experiment_settings.rho,
                                                 lr=experiment_settings.eta)
-        opt_strategy = SGDTorchOptimizationStrategy(step_schedule=step_schedule)
+        opt_strategy = SGDTorchOptimizationStrategy(step_schedule=step_schedule,
+                                                    decay_step=experiment_settings.eta_decay_step,
+                                                    decay_mult=experiment_settings.eta_decay_mult)
 
         return ExperimentRunner(data_loader_factory=data_loader_factory,
                                 opt_budget_class=opt_budget_class,
@@ -306,6 +340,7 @@ class DefaultExperimentConfigurer:
                                 common_settings=self.common_settings,
                                 experiment_settings=experiment_settings,
                                 alt_budgets_to_use=alt_budgets_to_use,
+                                alt_starting_point_nodes=alt_starting_point_nodes,
                                 validation_batch_size=experiment_settings.batch_size,
                                 test_batch_size=experiment_settings.batch_size)
 
@@ -319,6 +354,7 @@ class ExperimentRunner:
                  common_settings: CommonSettings,
                  experiment_settings: ExperimentSettings,
                  alt_budgets_to_use,
+                 alt_starting_point_nodes,
                  validation_batch_size,
                  test_batch_size):
         self.data_loader_factory = data_loader_factory
@@ -328,6 +364,7 @@ class ExperimentRunner:
         self.common_settings = common_settings
         self.experiment_settings = experiment_settings
         self.alt_budgets_to_use = alt_budgets_to_use
+        self.alt_starting_point_nodes = alt_starting_point_nodes
         self.validation_batch_size = validation_batch_size
         self.test_batch_size = test_batch_size
 
@@ -336,7 +373,7 @@ class ExperimentRunner:
         self.tree_eval = None
         self.best_sol = None
 
-    def _run_once(self, exp_budget, opt_budget, partitioning_strategy):
+    def _run_once(self, exp_budget, opt_budget, partitioning_strategy, starting_point):
         self.mf_fn = MFFunction(validation_fn=self.experiment_settings.validation_fn,
                                 test_fn=self.experiment_settings.test_fn,
                                 loss_fn=self.experiment_settings.loss_fn,
@@ -348,7 +385,7 @@ class ExperimentRunner:
                                 optimization_strategy=self.opt_strategy,
                                 use_test_error=self.experiment_settings.record_test_error)
         self.root = MFNode(simplex_pts=self.common_settings.initial_simplex,
-                           starting_point=self.experiment_settings.starting_point,
+                           starting_point=starting_point,
                            mf_fn=self.mf_fn,
                            nu=self.experiment_settings.nu,
                            rho=self.experiment_settings.rho,
@@ -358,9 +395,15 @@ class ExperimentRunner:
                                                                height_cap=self.experiment_settings.optimization_budget_height_cap))
 
         # Use the same framework, but only evaluate the root
-        self.tree_eval = DOOTreeEvaluator(root=self.root,
-                                          budget=exp_budget,
-                                          return_best_deepest_node=self.experiment_settings.return_best_deepest_node)
+        if self.experiment_settings.evaluate_best_result_again:
+            self.tree_eval = ExtendedRunsDOOTreeEvaluator(root=self.root,
+                                                          budget=exp_budget,
+                                                          return_best_deepest_node=self.experiment_settings.return_best_deepest_node,
+                                                          eta_mult=self.experiment_settings.evaluate_best_result_again_eta_mult)
+        else:
+            self.tree_eval = DOOTreeEvaluator(root=self.root,
+                                              budget=exp_budget,
+                                              return_best_deepest_node=self.experiment_settings.return_best_deepest_node)
         self.best_sol, execution_time = self.tree_eval.evaluate(debug=True)
         print("Best solution:\n", self.best_sol, "\n")
         # if plot:
@@ -385,6 +428,10 @@ class ExperimentRunner:
                     optimization_budget = self.alt_budgets_to_use[budget_id][rep]
                 else:
                     optimization_budget = self.experiment_settings.optimization_budgets[budget_id]
+                if self.alt_starting_point_nodes is not None:
+                    starting_point = self.alt_starting_point_nodes[budget_id][rep].final_model
+                else:
+                    starting_point = self.experiment_settings.starting_point
                 print("Running for exp budget:", experiment_budget,
                       "and opt budget:", optimization_budget,
                       "at repeat:", rep)
@@ -394,7 +441,8 @@ class ExperimentRunner:
                     partitioning_strategy = self.partitioning_strategy
                 best_sol, total_cost, execution_time = self._run_once(opt_budget=optimization_budget,
                                                                       exp_budget=experiment_budget,
-                                                                      partitioning_strategy=partitioning_strategy)
+                                                                      partitioning_strategy=partitioning_strategy,
+                                                                      starting_point=starting_point)
                 val = best_sol.value.item()
                 print("best_sol_val_iter_{}={}".format(rep, val))
                 vals.append(val)
@@ -444,7 +492,8 @@ class ExperimentManager:
                 repeated_experiment_results = runner.run(record_final_mixtures=True)
                 with open(self.experiment_file_prefix + "_ACTUAL_MIXTURES_AND_BUDGETS.p", 'wb') as f:
                     pickle.dump({"mixtures": repeated_experiment_results.final_mixtures_all,
-                                 "budgets": repeated_experiment_results.actual_costs_all}, f)
+                                 "budgets": repeated_experiment_results.actual_costs_all,
+                                 "best_sols": repeated_experiment_results.best_sols_all}, f)
             else:
                 runner = self.experiment_configurer.configure(exper_setting)
                 repeated_experiment_results = runner.run(record_final_mixtures=False)

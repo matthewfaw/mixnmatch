@@ -69,12 +69,19 @@ class MFNode:
         return self.value + self.nu * (self.rho ** self.height)
 
     def evaluate(self, eval_number):
+        self.opt_budget = self.opt_budget_fn(self.height, self.eval_number)
+        return self._evaluate(eval_number, self.starting_point, self.opt_budget)
+
+    def evaluate_with_final(self, opt_budget, eta_mult):
+        return self._evaluate(self.eval_number + 1, self.final_model, opt_budget, eta_mult)
+
+    def _evaluate(self, eval_number, starting_point, opt_budget, eta_mult=1.):
         start = dt.now()
         self.eval_number = eval_number
-        self.opt_budget = self.opt_budget_fn(self.height, self.eval_number)
-        self.value, self.final_model = self.mf_fn.fn(self.starting_point,
+        self.value, self.final_model = self.mf_fn.fn(starting_point,
                                                      self.mixture,
-                                                     self.opt_budget)
+                                                     opt_budget,
+                                                     eta_mult)
         end = dt.now()
         self.execution_time = end - start
         return self.value

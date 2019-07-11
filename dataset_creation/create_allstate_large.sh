@@ -13,6 +13,7 @@ if [[ -z "$GCLOUD_DATASET_BUCKET" ]]; then
 else
     echo "Using Gcloud project: $GCLOUD_DATASET_BUCKET"
 fi
+
 DOWNLOAD_TRANSFORMED=True
 DATASET_PATH=/transfer/transformed.csv
 DATASET_ID=allstate
@@ -31,7 +32,7 @@ done
 #FL -- largely 2 -- 106287
 #KS -- largely 2 -- 5585
 #CT -- almost all 0 -- 19353
-VAL_TRAIN_VAL_TEST="NY:0.01,0.495,0.495|MO:0.6,0.2,0.2|OK:0.2,0.4,0.4|FL:0.9,0.05,0.05|KS:0.4,0.3,0.3|CT:0.01,0.495,0.495"
+VAL_TRAIN_VAL_TEST="NY:0.01,0.495,0.495,0.0|MO:0.6,0.2,0.2,0.0|OK:0.2,0.4,0.4,0.0|FL:0.9,0.05,0.05,0.0|KS:0.4,0.3,0.3,0.0|CT:0.01,0.495,0.495,0.0"
 TAG=latest
 SIZE=large
 

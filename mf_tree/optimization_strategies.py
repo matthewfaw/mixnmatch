@@ -7,6 +7,9 @@ class OptimizationStrategy:
                  step_schedule):
         self.step_schedule = step_schedule
 
+    def get_lr(self):
+        return self.step_schedule.lr
+
 
 class SGDOptimizationStrategy(OptimizationStrategy):
     def get_num_steps(self, node_eval_number):
@@ -25,12 +28,17 @@ class SGDOptimizationStrategy(OptimizationStrategy):
 
 class SGDTorchOptimizationStrategy(OptimizationStrategy):
 
-    def __init__(self, step_schedule):
+    def __init__(self, step_schedule, decay_step=0, decay_mult=1):
         super().__init__(step_schedule)
-        self.lr = step_schedule.lr
+        self.decay_step = decay_step
+        self.decay_mult = decay_mult
 
-    def optimize(self, fn_to_opt, starting_point, data_loader):
-        optimizer = optim.SGD(starting_point.parameters(), lr=self.lr)
+    def optimize(self, fn_to_opt, starting_point, data_loader, eta_mult):
+        optimizer = optim.SGD(starting_point.parameters(), lr=eta_mult * self.get_lr())
+        if self.decay_step > 0:
+            scheduler = optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=self.decay_step, gamma=self.decay_mult)
+        else:
+            scheduler = None
 
         model = starting_point
 
@@ -42,4 +50,6 @@ class SGDTorchOptimizationStrategy(OptimizationStrategy):
             loss = fn_to_opt(preds, label_batch)
             loss.backward()
             optimizer.step()
+            if scheduler is not None:
+                scheduler.step()
         return model

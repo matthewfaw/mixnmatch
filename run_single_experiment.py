@@ -17,9 +17,11 @@ def process(args):
             budget_mixture_map = pickle.load(bm)
             actual_budgets = budget_mixture_map["budgets"]
             actual_mixtures = budget_mixture_map["mixtures"]
+            actual_best_sols = budget_mixture_map["best_sols"]
     else:
         actual_budgets = None
         actual_mixtures = None
+        actual_best_sols = None
 
     cols_to_censor = args.columns_to_censor.split(',') if args.columns_to_censor is not None else []
     experiment_config = DefaultExperimentConfigurer(data=data,
@@ -49,26 +51,36 @@ def process(args):
         print("Unsupported loss function/model for dataset id", args.dataset_id,"Cannot continue")
         assert False
 
+    if args.custom_mixture and args.mixture_selection_strategy == "custom":
+        custom_mixture = [float(el) for el in args.custom_mixture.split(',')]
+        print("Using custom mixture:", custom_mixture)
+    else:
+        custom_mixture = None
+
     curr_time = dt.now().strftime('day-%Y-%m-%d-time-%H-%M-%S')
     print("Determined current time to be:", curr_time)
-    output_filename = "{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}".format(args.experiment_type,
-                                                                                        args.optimization_budget,
-                                                                                        args.optimization_budget_multiplier,
-                                                                                        args.optimization_budget_height_cap,
-                                                                                        args.inner_layer_mult,
-                                                                                        args.budget_min,
-                                                                                        args.budget_max,
-                                                                                        args.budget_step,
-                                                                                        args.num_repeats,
-                                                                                        args.batch_size,
-                                                                                        args.nu,
-                                                                                        args.rho,
-                                                                                        args.eta,
-                                                                                        args.return_best_deepest_node,
-                                                                                        args.mixture_selection_strategy,
-                                                                                        args.record_test_error,
-                                                                                        curr_time,
-                                                                                        args.tag)
+    output_filename = "{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}".format(args.experiment_type,
+                                                                                                 args.optimization_budget,
+                                                                                                 args.optimization_budget_multiplier,
+                                                                                                 args.optimization_budget_height_cap,
+                                                                                                 args.inner_layer_mult,
+                                                                                                 args.budget_min,
+                                                                                                 args.budget_max,
+                                                                                                 args.budget_step,
+                                                                                                 args.num_repeats,
+                                                                                                 args.batch_size,
+                                                                                                 args.nu,
+                                                                                                 args.rho,
+                                                                                                 args.eta,
+                                                                                                 args.eta_decay_step,
+                                                                                                 args.eta_decay_mult,
+                                                                                                 args.return_best_deepest_node,
+                                                                                                 args.mixture_selection_strategy,
+                                                                                                 args.custom_mixture,
+                                                                                                 args.evaluate_best_result_again,
+                                                                                                 args.record_test_error,
+                                                                                                 curr_time,
+                                                                                                 args.tag)
     print("Using output filename:", output_filename)
 
     exper_setting = ExperimentSettings(experiment_type=args.experiment_type,
@@ -88,11 +100,17 @@ def process(args):
                                        nu=args.nu,
                                        rho=args.rho,
                                        eta=args.eta,
+                                       eta_decay_step=args.eta_decay_step,
+                                       eta_decay_mult=args.eta_decay_mult,
                                        batch_size=args.batch_size,
                                        plot_fmt='rs-',
                                        mixture_selection_strategy=args.mixture_selection_strategy,
+                                       custom_mixture=custom_mixture,
+                                       evaluate_best_result_again=args.evaluate_best_result_again,
+                                       evaluate_best_result_again_eta_mult=args.evaluate_best_result_again_eta_mult,
                                        actual_budgets=actual_budgets,
                                        actual_mixtures=actual_mixtures,
+                                       actual_best_sols=actual_best_sols,
                                        record_test_error=args.record_test_error)
 
     exper_manager = ExperimentManager(experiment_settings_list=[exper_setting],
@@ -114,7 +132,7 @@ def main():
     parser.add_argument("--dataset-id", type=str, required=True, choices=['allstate','MNIST','wine'], help="the dataset identifier to process")
     parser.add_argument("--actual-budgets-and-mixtures-path", type=str, default=None, help="The path to the pickled list of mixtures to use.  If used, the budgets override the budget min/max/step, and the mixtures in this file are used if the mixture-selection-strategy is tree-results")
     parser.add_argument("--experiment-type", type=str, required=True, choices=['tree', 'uniform', 'constant-mixture', 'mmd'], help="The type of experiment to run")
-    parser.add_argument("--optimization-budget", type=str, required=True, choices=['constuntil', 'linear', 'height', 'constant'], help="The budget function to use at each node")
+    parser.add_argument("--optimization-budget", type=str, required=True, choices=['constuntil', 'linear', 'sqrt', 'height', 'constant'], help="The budget function to use at each node")
     parser.add_argument("--optimization-budget-multiplier", type=int, default=1, help="The constant to multiply each optimization budget by")
     parser.add_argument("--optimization-budget-height-cap", type=float, default=np.inf, help="The max height for which opt budget is height-dependent")
     parser.add_argument("--budget-min", type=int, required=True, help="The minimum budget to use")
@@ -125,14 +143,19 @@ def main():
     parser.add_argument("--nu", type=float, required=True, help="Nu")
     parser.add_argument("--rho", type=float, required=True, help="Rho")
     parser.add_argument("--eta", type=float, required=True, help="The step size")
+    parser.add_argument("--eta-decay-step", type=int, required=False, default=0, help="The number of steps between each step size decrease. If 0, then this setting is not used")
+    parser.add_argument("--eta-decay-mult", type=float, required=False, default=1., help="The amount to multiply eta by after each eta-decay-step steps. If eta-decay-step is 0, then this setting is not used")
     parser.add_argument("--return-best-deepest-node", type=bool, required=True, help="Indicates whether best nodes only at the deepest height (True) or any height (False) should be considered")
     parser.add_argument("--sample-with-replacement", type=bool, default=True, help="Indicates whether best nodes only at the deepest height (True) or any height (False) should be considered")
-    parser.add_argument("--mixture-selection-strategy", type=str, required=True, choices=["delaunay-partitioning", "coordinate-halving", "tree-results", "alpha-star", "uniform"], help="The mixture selection strategy to use.")
+    parser.add_argument("--mixture-selection-strategy", type=str, required=True, choices=["delaunay-partitioning", "coordinate-halving", "tree-results", "alpha-star", "uniform", "custom"], help="The mixture selection strategy to use.")
+    parser.add_argument("--custom-mixture", type=str, required=False, default="", help="The (comma separated) mixture to use. Only used when mixture-selection-strategy is set to 'custom'")
     parser.add_argument("--columns-to-censor", type=str, default=None, help="The columns to remove from the dataset.")
     parser.add_argument("--output-dir", type=str, required=True, help="The directory in which output files will be placed")
     parser.add_argument("--tag", type=str, default="missingtag", help="The image tag used in running this experiment")
     parser.add_argument("--record-test-error", type=bool, default=False, help="Determines whether or not test error should be recorded. This toggles whether the validation or test dataset is used.")
     parser.add_argument("--inner-layer-mult", type=float, default=2., help="Determines the number of inner layers of the neural network (unless the dataset id is wine, in which case the network is not configurable).  Num inner layers will be int(inner_layer_mult * input_dim)")
+    parser.add_argument("--evaluate-best-result-again", type=bool, default=False, help="If set to True, will evaluate the best node returned by tree search with the same total budget spent so far. Thus, the budget used will be doubled that requested")
+    parser.add_argument("--evaluate-best-result-again-eta-mult", type=float, default=1., help="Amount to scale eta by during eval-best-result-again")
     # parser.add_argument("--output-filename", type=str, required=True, help="The output filename")
 
     args = parser.parse_args()
@@ -145,20 +168,20 @@ if __name__ == "__main__":
     #     "--dataset-path", "experiment_running/dataset.p",
     #     "--dataset-id", "allstate",
     #     "--experiment-type", "tree",
-    #     "--optimization-budget", "constant",
-    #     "--optimization-budget-multiplier", "100",
+    #     "--optimization-budget", "height",
+    #     "--optimization-budget-multiplier", "881",
     #     "--budget-min", "1000",
     #     "--budget-max", "3000",
     #     "--budget-step", "1000",
     #     "--num-repeats", "2",
-    #     "--batch-size", "50",
-    #     "--nu", "80",
-    #     "--rho", "0.9",
-    #     "--eta", "0.0001",
+    #     "--batch-size", "22",
+    #     "--nu", "43.7639",
+    #     "--rho", "0.8209",
+    #     "--eta", "0.0066",
     #     "--return-best-deepest-node", "True",
     #     "--output-dir", "derp",
     #     "--mixture-selection-strategy", "coordinate-halving",
-    #     "--columns-to-censor", "",
-    #     "--optimization-budget-height-cap", "inf"
+    #     "--columns-to-censor", "A_changes,B_changes,C_changes,C_previous,D_changes,E_changes,F_changes,G_changes,age_oldest,age_youngest,car_age,car_value_a,car_value_b,car_value_c,car_value_d,car_value_e,car_value_f,car_value_g,car_value_h,cost_avg,duration_previous,group_size,homeowner,location,married_couple,num_days,num_shopping_pts,risk_factor,time_range_sec",
+    #     "--optimization-budget-height-cap", "8"
     # ])
     main()

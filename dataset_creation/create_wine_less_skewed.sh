@@ -13,6 +13,7 @@ if [[ -z "$GCLOUD_DATASET_BUCKET" ]]; then
 else
     echo "Using Gcloud project: $GCLOUD_DATASET_BUCKET"
 fi
+
 DOWNLOAD_TRANSFORMED=True
 DATASET_PATH=/transfer/transformed.csv
 DATASET_ID=wine
@@ -29,7 +30,7 @@ COLS_TO_DROP=Other
 # Spain: 6573
 # France: 17776
 # New Zealand: 1378
-VAL_TRAIN_VAL_TEST="US:0.4,0.3,0.3|Italy:0.2,0.4,0.4|Portugal:0.8,0.1,0.1|France:0.1,0.45,0.45|New Zealand:0.4,0.3,0.3"
+VAL_TRAIN_VAL_TEST="US:0.4,0.3,0.3,0.0|Italy:0.2,0.4,0.4,0.0|Portugal:0.8,0.1,0.1,0.0|France:0.1,0.45,0.45,0.0|New Zealand:0.4,0.3,0.3,0.0"
 TAG=latest
 SIZE=less-skewed
 

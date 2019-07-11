@@ -13,6 +13,7 @@ if [[ -z "$GCLOUD_DATASET_BUCKET" ]]; then
 else
     echo "Using Gcloud project: $GCLOUD_DATASET_BUCKET"
 fi
+
 DOWNLOAD_TRANSFORMED=True
 DATASET_PATH=/transfer/transformed.csv
 DATASET_ID=allstate
@@ -25,7 +26,7 @@ for key in {A..G}; do
         COLS_TO_DROP+=",${key}_final"
     fi
 done
-VAL_TRAIN_VAL_TEST="NY:0.7,0.15,0.15|CT:0.1,0.45,0.45|FL:0.3,0.35,0.35"
+VAL_TRAIN_VAL_TEST="NY:0.7,0.15,0.15,0.0|CT:0.1,0.45,0.45,0.0|FL:0.3,0.35,0.35,0.0"
 TAG=latest
 SIZE=small
 

@@ -57,7 +57,7 @@ spec:
                 --split-key <SPLIT_KEY> \
                 --target <TARGET> \
                 --cols-to-drop "<COLS_TO_DROP>" \
-                --val-train-val-test "<VAL_TRAIN_VAL_TEST>" \
+                --val-train-val-test-drop "<VAL_TRAIN_VAL_TEST>" \
                 --output-dir "/output" \
                 --unique-image-tag "<TAG>"
       containers:

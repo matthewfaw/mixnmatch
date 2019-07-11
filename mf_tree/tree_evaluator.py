@@ -24,7 +24,6 @@ class DOOTreeEvaluator(TreeEvaluator):
         sys.stdout = self._original_stdout
 
     def _evaluate(self):
-        start = dt.now()
         eval_number = 1
         self.root.evaluate(eval_number)
         self.leaves.put(self.root)
@@ -44,13 +43,10 @@ class DOOTreeEvaluator(TreeEvaluator):
                 print("remaining_budget={}".format(self.budget - self.total_cost))
                 self.leaves.put(child)
         print("Out of money -- exiting")
-        end = dt.now()
-        self.execution_time = end - start
-        print("doo_tree_eval_execution_time={}".format(self.execution_time.total_seconds()))
         best_node = self._get_best_node()
         print("best_node_height={}".format(best_node.height))
         print("best_node_value={}".format(best_node.value))
-        return best_node, self.execution_time
+        return best_node
 
     def _get_best_node(self):
         best_node = None
@@ -67,7 +63,27 @@ class DOOTreeEvaluator(TreeEvaluator):
             # Blocking all print calls
             self.disable_printing()
         try:
-            return self._evaluate()
+            start = dt.now()
+            best_node = self._evaluate()
+            end = dt.now()
+            self.execution_time = end - start
+            print("doo_tree_eval_execution_time={}".format(self.execution_time.total_seconds()))
+            return best_node, self.execution_time
         finally:
             if not debug:
                 self.enable_printing()
+
+
+class ExtendedRunsDOOTreeEvaluator(DOOTreeEvaluator):
+    def __init__(self, root, budget, return_best_deepest_node, eta_mult):
+        super().__init__(root, budget, return_best_deepest_node)
+        self.eta_mult = eta_mult
+
+    def _evaluate(self):
+        best_node = super()._evaluate()
+        print("Evaluating best node with budget {}".format(self.total_cost))
+        best_node.evaluate_with_final(self.total_cost, self.eta_mult)
+        self.total_cost *= 2
+        print("final_best_node_value={}".format(best_node.value))
+        print("final_total_cost={}".format(self.total_cost))
+        return best_node

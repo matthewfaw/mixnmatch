@@ -6,19 +6,20 @@ from datasets.torch_dataset import TorchData
 def process(args):
     breakdown = {}
     vals_to_split = []
-    for entry in args.val_train_val_test.split('|'):
+    for entry in args.val_train_val_test_drop.split('|'):
         val, tvt = entry.split(':')
-        train, validate, test = [float(v) for v in tvt.split(',')]
-        if sum([train, validate, test]) <= 1.0:
+        train, validate, test, drop = [float(v) for v in tvt.split(',')]
+        if sum([train, validate, test, drop]) <= 1.0:
             setting = "percents"
         else:
             setting = "total"
-        print("Determined train/val/test split reported as", setting)
+        print("Determined train/val/test/drop split reported as", setting)
         breakdown[val] = {
             "setting": setting,
             "train": float(train),
             "validate": float(validate),
-            "test": float(test)
+            "test": float(test),
+            "drop": float(drop)
         }
         vals_to_split.append(val)
 
@@ -46,7 +47,7 @@ def process(args):
                                             args.dataset_id,
                                             args.split_key,
                                             args.target,
-                                            args.val_train_val_test,
+                                            args.val_train_val_test_drop,
                                             args.unique_image_tag)
 
     print("Dumping dataset object to", filename)
@@ -62,7 +63,7 @@ def main():
     parser.add_argument("--split-key", type=str, required=True, help="Key to split the dataset on")
     parser.add_argument("--target", type=str, required=True, help="Target column name")
     parser.add_argument("--cols-to-drop", type=str, default="", help="Column names to drop")
-    parser.add_argument("--val-train-val-test", type=str, required=True, help="State1:Train,Validate,Test|... percentage split")
+    parser.add_argument("--val-train-val-test-drop", type=str, required=True, help="State1:Train,Validate,Test,Drop|... percentage split")
     parser.add_argument("--output-dir", type=str, required=True, help="The directory in which output files will be placed")
     parser.add_argument("--unique-image-tag", type=str, required=True, help="The tag of the image currently being used -- intendent to be the tag that doesn't change")
 
@@ -79,7 +80,7 @@ if __name__ == "__main__":
     #     "--split-key", "",
     #     "--target", "",
     #     "--cols-to-drop", "",
-    #     "--val-train-val-test", "1:5000,1000,742|4:842,2500,2500|7:3000,3000,265",
+    #     "--val-train-val-test-drop", "1:5000,1000,742,0|4:842,2500,2500,0|7:3000,3000,265,0",
     #     "--output-dir", "./derp",
     #     "--unique-image-tag", "latest"
     # ])

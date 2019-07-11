@@ -53,16 +53,24 @@ class PandasData:
             df_for_key = self.df.loc[self.df[key_to_split_on] == key]
             if info['setting'] == "percents":
                 train_size = info["train"]
-                not_train_size = 1. - train_size
+                drop_size = info["drop"]
+                not_train_size = 1. - train_size - drop_size
                 validate_size = info["validate"] / not_train_size if not_train_size != 0. else 0.
                 test_size = 1. - validate_size
 
-                if train_size == 0.0:
-                    train, not_train = None, df_for_key
-                elif train_size == 1.0:
-                    train, not_train = df_for_key, None
+                if drop_size == 0.0:
+                    curr_data, _ = df_for_key, None
+                elif drop_size == 1.0:
+                    curr_data, _ = None, df_for_key
                 else:
-                    train, not_train = train_test_split(df_for_key, train_size=train_size)
+                    curr_data, _ = train_test_split(df_for_key, train_size=(1.-drop_size))
+
+                if train_size == 0.0:
+                    train, not_train = None, curr_data
+                elif train_size == 1.0:
+                    train, not_train = curr_data, None
+                else:
+                    train, not_train = train_test_split(curr_data, train_size=train_size)
                 if validate_size == 0.0:
                     validate, test = None, not_train
                 elif test_size == 0.0:
@@ -75,9 +83,6 @@ class PandasData:
                     self.validate = pd.concat((self.validate, validate))
                 if test is not None:
                     self.test = pd.concat((self.test, test))
-            elif info['setting'] == "val_test":
-                sample = df_for_key.sample(info["test"])
-                self.test = pd.concat((self.test, sample)) if self.test is not None else sample
 
         self.train_mixture = self.train[key_to_split_on].value_counts(normalize=True)[vals_to_split].dropna().to_numpy()
         print("Train mixture:",self.train_mixture)

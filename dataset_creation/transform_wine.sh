@@ -1,18 +1,6 @@
 #!/bin/bash
 set -e
 
-if [[ -z "$GCLOUD_PROJECT" ]]; then
-    echo "Must have GCLOUD_PROJECT env var set. Cannot proceed."
-    exit 1
-else
-    echo "Using Gcloud project: $GCLOUD_PROJECT"
-fi
-if [[ -z "$GCLOUD_DATASET_BUCKET" ]]; then
-    echo "Must have GCLOUD_DATASET_BUCKET env var set. Cannot proceed."
-    exit 1
-else
-    echo "Using Gcloud project: $GCLOUD_DATASET_BUCKET"
-fi
 KAGGLE_SRC=dbahri/wine-ratings
 KAGGLE_API_TYPE=datasets
 DATASET_ID=wine

@@ -43,11 +43,12 @@ class TorchData:
                 mult = len(src_dataset)
             else:
                 mult = 1
-            tr, val, test = random_split(src_dataset,
+            tr, val, test, _ = random_split(src_dataset,
                                          mult * \
                                          torch.Tensor([info['train'],
                                                        info['validate'],
-                                                       info['test']]).int())
+                                                       info['test'],
+                                                       info['drop']]).int())
             self.train_mixture[transformed_label] = len(tr)
             self.validate_mixture[transformed_label] = len(val)
             self.test_mixture[transformed_label] = len(test)

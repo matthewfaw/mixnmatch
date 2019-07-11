@@ -13,6 +13,7 @@ if [[ -z "$GCLOUD_DATASET_BUCKET" ]]; then
 else
     echo "Using Gcloud project: $GCLOUD_DATASET_BUCKET"
 fi
+
 TAG=latest
 DATASET_ID=$1
 DATASET_ID_LOWER=$(echo $DATASET_ID | tr '[:upper:]' '[:lower:]')
@@ -32,20 +33,28 @@ BATCH_SIZE=${14}
 NU=${15}
 RHO=${16}
 ETA=${17}
+#ETA_DECAY_STEP=30000
+#ETA_DECAY_MULT=0.5
+ETA_DECAY_STEP=0
+ETA_DECAY_MULT=1
 RETURN_BEST_DEEPEST_NODE=${18}
 MIXTURE_SELECTION_STRATEGY=${19}
-COLUMNS_TO_CENSOR=${20}
-ACTUAL_MIXTURES_AND_BUDGETS_CM=${21}
-PUBLISH_CM=${22}
-SIZE=${23}
-DATE=${24}
-GROUP_WITH=${25}
+CUSTOM_MIXTURE=${20}
+COLUMNS_TO_CENSOR=${21}
+ACTUAL_MIXTURES_AND_BUDGETS_CM=${22}
+PUBLISH_CM=${23}
+SIZE=${24}
+DATE=${25}
+GROUP_WITH=${26}
+EVALUATE_BEST_RESULT_AGAIN=${27}
+EVALUATE_BEST_RESULT_AGAIN_ETA_MULT=0.1
 if [[ "$PUBLISH_CM" = "true" ]]; then
     CM_TO_PUBLISH=${DATASET_ID_LOWER}-${SIZE}-${EXPERIMENT_TYPE}-${OPT_BUDGET}-${MIXTURE_SELECTION_STRATEGY}-${DATE}
 else
     CM_TO_PUBLISH=""
 fi
 RECORD_TEST_ERROR=True
+#RECORD_TEST_ERROR=""
 RAND_ALPHNUM=$(openssl rand -hex 12)
 EXP_GROUPING="exp-run-${DATE}"
 UNIQUE_ID=$(echo $RAND_ALPHNUM | cut -c -$((63 - $(echo $EXP_GROUPING | wc -c) + 1)) )
@@ -73,8 +82,11 @@ cat run_experiment.yaml |\
     sed "s/<NU>/${NU}/g" |\
     sed "s/<RHO>/${RHO}/g" |\
     sed "s/<ETA>/${ETA}/g" |\
+    sed "s/<ETA_DECAY_STEP>/${ETA_DECAY_STEP}/g" |\
+    sed "s/<ETA_DECAY_MULT>/${ETA_DECAY_MULT}/g" |\
     sed "s/<RETURN_BEST_DEEPEST_NODE>/${RETURN_BEST_DEEPEST_NODE}/g" |\
     sed "s/<MIXTURE_SELECTION_STRATEGY>/${MIXTURE_SELECTION_STRATEGY}/g" |\
+    sed "s/<CUSTOM_MIXTURE>/${CUSTOM_MIXTURE}/g" |\
     sed "s/<COLUMNS_TO_CENSOR>/${COLUMNS_TO_CENSOR}/g" |\
     sed "s/<ACTUAL_MIXTURES_AND_BUDGETS_CM>/${ACTUAL_MIXTURES_AND_BUDGETS_CM}/g" |\
     sed "s/<CM_TO_PUBLISH>/${CM_TO_PUBLISH}/g" |\
@@ -84,5 +96,7 @@ cat run_experiment.yaml |\
     sed "s/<UNIQUE_ID>/${UNIQUE_ID}/g" |\
     sed "s/<JOB_NAME>/${JOB_NAME}/g" |\
     sed "s/<GROUP_WITH>/${GROUP_WITH}/g" |\
+    sed "s/<EVALUATE_BEST_RESULT_AGAIN>/${EVALUATE_BEST_RESULT_AGAIN}/g" |\
+    sed "s/<EVALUATE_BEST_RESULT_AGAIN_ETA_MULT>/${EVALUATE_BEST_RESULT_AGAIN_ETA_MULT}/g" |\
     tee /dev/tty |\
     kubectl apply -f -
