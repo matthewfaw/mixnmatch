@@ -2,7 +2,9 @@
 
 **This is the code used to run simulations associated with our Mix&Match paper:** <INSERT-LINK-HERE>
  
- _Please cite the above paper if this code is used in any publication_
+ _Please cite the above paper if this code is used in any publication._
+ 
+ **Code to setup the infrastructure to run these experiments in Google Cloud can be found [here](https://github.com/matthewfaw/mixnmatch-infrastructure).** 
 
 ## How-To
 
