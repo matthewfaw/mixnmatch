@@ -1,6 +1,10 @@
 # Mix&Match: An Optimistic Tree-Search Approach for Learning Models from Mixture Distributions
 
-This is the code used to run simulations associated with our Mix&Match paper.
+**This is the code used to run simulations associated with our Mix&Match paper:** <INSERT-LINK-HERE>
+ 
+ _Please cite the above paper if this code is used in any publication_
+
+## How-To
 
 The main entrypoint to run an experiment is:
 `run_single_experiment.py`. This script can be run locally,
@@ -20,9 +24,10 @@ To run the allstate dataset, first preprocess the dataset using the scripts in t
 `dataset_creation` folder,
 `transform_allstate.sh` (to preprocess the dataset), then `create_allstate_*.sh`
  (to partition the dataset in the desired manner),
-then run one of the allstate run all scripts in the `experiment_running`
+then hyperparameter tune using a script in the `hyperparameter_tuning` folder and
+run one of the allstate run all scripts in the `experiment_running`
 folder.
- The wine dataset can be created by running the same sequence of 
+The wine dataset can be created by running the same sequence of 
 the corresponding scripts.  The mnist experiment can be run using the above
 steps, except skipping the `transform_...sh` script. 
 Note that the `transform_*sh` script runs the `transform_*.py` file, and the
@@ -36,8 +41,7 @@ in the Jenkinsfile should be changed to point to your Google Cloud project id.
 After the container has been published, the experiments can be run using one
 of the scripts in the `experiment_running` folder.  Hyperparameter tuning
 is performed using [Katib](https://github.com/kubeflow/katib) by running the
-`katib_experiment_*.sh` scripts,
-and testing experiments can be run using `<DATASET_ID>_run_all.sh`.
+`katib_experiment_*.sh` scripts in the `hyperparameter_tuning` folder.
 
 Experiments can be visualized by using the code in `ExamineGraphs.ipynb`.
 A convenience script (and instructions for running the script) that can be used to spin up a Jupyter server 
@@ -53,9 +57,11 @@ Code dealing with data lives in the `datasets/` dir, and code dealing with
 experiment running, and defining the tree search data structures, lives in
 the `mf_tree/` dir.
 
-More documentation to individual files will be added in the future.
-
 I have run these scripts on a Macbook Pro with 
 2.7 GHz Intel Core i7 and 16GB of RAM to create the experiments in a kubernetes cluster
 (created by [this](https://github.com/matthewfaw/mixnmatch-infrastructure) project)
 running in Google Cloud.
+
+## License
+
+**This project is licensed under the terms of the Apache 2.0 License.**
