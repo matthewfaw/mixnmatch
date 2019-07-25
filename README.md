@@ -1,6 +1,6 @@
 # Mix&Match: An Optimistic Tree-Search Approach for Learning Models from Mixture Distributions
 
-**This is the code used to run simulations associated with our Mix&Match paper:** <INSERT-LINK-HERE>
+**This is the code used to run simulations associated with our Mix&Match paper:** https://arxiv.org/abs/1907.10154
  
  _Please cite the above paper if this code is used in any publication._
  
