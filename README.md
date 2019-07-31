@@ -13,7 +13,7 @@ The main entrypoint to run an experiment is:
 or on k8s using one of the scripts in `experiment_running` folder.
 
 The project assumes the following environment variables have been set:
-- `GCLOUD_DATASET_BUCKET_BASE`: The base bucket name where datasets and experiment results will be stored. E.g. `gs://your-bucket-name`
+- `GCLOUD_DATASET_BUCKET`: The base bucket name where datasets and experiment results will be stored. E.g. `gs://your-bucket-name`
 - `GCLOUD_PROJECT`: The project name associated with all Google cloud resources you're using. Note that this can be different from your google cloud project name.
 
 The infrastructure for running all code in this project can be created by
@@ -43,7 +43,8 @@ in the Jenkinsfile should be changed to point to your Google Cloud project id.
 After the container has been published, the experiments can be run using one
 of the scripts in the `experiment_running` folder.  Hyperparameter tuning
 is performed using [Katib](https://github.com/kubeflow/katib) by running the
-`katib_experiment_*.sh` scripts in the `hyperparameter_tuning` folder.
+`katib_experiment_*.sh` scripts,
+and testing experiments can be run using `<DATASET_ID>_run_all.sh`.
 
 Experiments can be visualized by using the code in `ExamineGraphs.ipynb`.
 A convenience script (and instructions for running the script) that can be used to spin up a Jupyter server 

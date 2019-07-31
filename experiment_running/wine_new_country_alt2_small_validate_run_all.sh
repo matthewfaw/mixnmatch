@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ID=wine
-FILE="wine_country_price_US:1.0,0.0,0.0|France:1.0,0.0,0.0|Italy:1.0,0.0,0.0|Spain:1.0,0.0,0.0|Chile:0.0,0.5,0.5_latest.p"
+FILE="wine_country_price_US:1.0,0.0,0.0,0.0|France:1.0,0.0,0.0,0.0|Italy:1.0,0.0,0.0,0.0|Spain:1.0,0.0,0.0,0.0|Chile:0.0,0.05,0.95,0.0_latest.p"
 OPT_MULT=500
 OPT_MULT_CONST_STD=1
 OPT_MULT_CONST_DOUBLE=1

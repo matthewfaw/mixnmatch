@@ -156,7 +156,7 @@ class SampledPandasDatasetFactory:
     def __init__(self, df, key_to_split_on, vals_to_split, with_replacement, is_categorical):
         self.df = deepcopy(df)
         self.key_to_split_on = key_to_split_on
-        self.vals_to_split = vals_to_split
+        self.vals_to_split = [val for val in vals_to_split if val in self.df[self.key_to_split_on].unique()]
         self.with_replacement = with_replacement
         self.is_categorical = is_categorical
 

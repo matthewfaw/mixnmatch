@@ -95,6 +95,7 @@ spec:
       parametertype: categorical
       feasible:
         list:
+          - "1.0"
           - "0.1"
           - "0.01"
           - "0.001"
@@ -167,7 +168,8 @@ spec:
                         --num-repeats <NUM_REPEATS> \
                         --columns-to-censor "<COLUMNS_TO_CENSOR>" \
                         --inner-layer-mult <INNER_LAYER_MULT> \
-                        --evaluate-best-result-again True \
+                        --evaluate-best-result-again "True" \
+                        --use-alt-loss-fn "True" \
                         {{- with .HyperParameters}}
                         {{- range .}}
                         {{.Name}} "{{.Value}}" \
@@ -191,7 +193,7 @@ spec:
                     name: <ACTUAL_MIXTURES_AND_BUDGETS_CM>
   suggestionSpec:
     suggestionAlgorithm: "random"
-    requestNumber: 15
+    requestNumber: 30
   metricscollectorspec:
     goTemplate:
       rawTemplate: |

@@ -59,6 +59,7 @@ RAND_ALPHNUM=$(openssl rand -hex 12)
 EXP_GROUPING="exp-run-${DATE}"
 UNIQUE_ID=$(echo $RAND_ALPHNUM | cut -c -$((63 - $(echo $EXP_GROUPING | wc -c) + 1)) )
 JOB_NAME="${EXP_GROUPING}-${UNIQUE_ID}"
+USE_ALT_LOSS_FN="True"
 
 cat run_experiment.yaml |\
     sed "s/<GCLOUD_PROJECT>/${GCLOUD_PROJECT}/g" |\
@@ -98,5 +99,6 @@ cat run_experiment.yaml |\
     sed "s/<GROUP_WITH>/${GROUP_WITH}/g" |\
     sed "s/<EVALUATE_BEST_RESULT_AGAIN>/${EVALUATE_BEST_RESULT_AGAIN}/g" |\
     sed "s/<EVALUATE_BEST_RESULT_AGAIN_ETA_MULT>/${EVALUATE_BEST_RESULT_AGAIN_ETA_MULT}/g" |\
+    sed "s/<USE_ALT_LOSS_FN>/${USE_ALT_LOSS_FN}/g" |\
     tee /dev/tty |\
     kubectl apply -f -

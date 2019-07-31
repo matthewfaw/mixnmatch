@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ID=allstate
-FILE="allstate_state_G_final_FL:1.0,0.0,0.0,0.0|CT:0.7,0.075,0.225,0.0|OH:0.0,0.0,0.0225,0.9775_latest.p"
+FILE="allstate_state_G_final_FL:1.0,0.0,0.0,0.0|CT:0.7,0.018,0.282,0.0|OH:0.0,0.0,0.0225,0.9775_latest.p"
 OPT_MULT=500
 OPT_MULT_CONST_STD=1
 OPT_MULT_CONST_DOUBLE=1
@@ -38,4 +38,5 @@ GROUP_WITH=""
 ./experiment.sh ${ID} "${FILE}" "constant-mixture" constant ${OPT_MULT_CONST_DOUBLE} ${OPT_HEIGHT_CAP} ${BUDGET_MIN} ${BUDGET_MAX} ${BUDGET_STEP} ${N_REPEATS} ${MEM_REQ} ${MEM_LIMIT} ${INNER_LAYER_MULT} ${BATCH} ${NU} ${RHO} ${ETA} "${RETURN_DEEPEST}" "custom" "0,1" ${COLS_TO_CENSOR} ${ACTUAL_MIXTURES_AND_BUDGETS_CM} false ${SIZE} ${DATE} "${GROUP_WITH}"
 ./experiment.sh ${ID} ${FILE} "uniform" constant ${OPT_MULT_CONST_DOUBLE} ${OPT_HEIGHT_CAP} ${BUDGET_MIN} ${BUDGET_MAX} ${BUDGET_STEP} ${N_REPEATS} ${MEM_REQ} ${MEM_LIMIT} ${INNER_LAYER_MULT} ${BATCH} ${NU} ${RHO} ${ETA} "${RETURN_DEEPEST}" "uniform" "" ${COLS_TO_CENSOR} ${ACTUAL_MIXTURES_AND_BUDGETS_CM} false ${SIZE} ${DATE} "${GROUP_WITH}"
 ./experiment.sh ${ID} ${FILE} "validation" constant ${OPT_MULT_CONST_DOUBLE} ${OPT_HEIGHT_CAP} ${BUDGET_MIN} ${BUDGET_MAX} ${BUDGET_STEP} ${N_REPEATS} ${MEM_REQ} ${MEM_LIMIT} ${INNER_LAYER_MULT} ${BATCH} ${NU} ${RHO} ${ETA} "${RETURN_DEEPEST}" "validation" "" ${COLS_TO_CENSOR} ${ACTUAL_MIXTURES_AND_BUDGETS_CM} false ${SIZE} ${DATE} "${GROUP_WITH}"
+
 

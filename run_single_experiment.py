@@ -2,7 +2,7 @@ import argparse, pickle, sys
 from datetime import datetime as dt
 import numpy as np
 import torch.nn as nn
-from mf_tree.eval_fns_torch import Net, MOEWNet, ExpMSE
+from mf_tree.eval_fns_torch import Net, MOEWNet, ExpMSE, ExpL1
 
 from mf_tree.experiment_runner import DefaultExperimentConfigurer, ExperimentSettings, ExperimentManager
 
@@ -43,9 +43,14 @@ def process(args):
                     inner_dim_mult=args.inner_layer_mult,
                     output_dim=experiment_config.num_vals_for_product)
     elif args.dataset_id in ["wine"]:
-        loss_fn = ExpMSE()
-        validation_fn= ExpMSE()
-        test_fn= ExpMSE()
+        if args.use_alt_loss_fn:
+            loss_fn = ExpL1()
+            validation_fn= ExpL1()
+            test_fn= ExpL1()
+        else:
+            loss_fn = ExpMSE()
+            validation_fn= ExpMSE()
+            test_fn= ExpMSE()
         model = MOEWNet(experiment_config.sample_dim)
     else:
         print("Unsupported loss function/model for dataset id", args.dataset_id,"Cannot continue")
@@ -131,7 +136,7 @@ def main():
     parser.add_argument("--dataset-path", type=str, required=True, help="path to pickled _Data object to process")
     parser.add_argument("--dataset-id", type=str, required=True, choices=['allstate','MNIST','wine'], help="the dataset identifier to process")
     parser.add_argument("--actual-budgets-and-mixtures-path", type=str, default=None, help="The path to the pickled list of mixtures to use.  If used, the budgets override the budget min/max/step, and the mixtures in this file are used if the mixture-selection-strategy is tree-results")
-    parser.add_argument("--experiment-type", type=str, required=True, choices=['tree', 'uniform', 'constant-mixture', 'mmd'], help="The type of experiment to run")
+    parser.add_argument("--experiment-type", type=str, required=True, choices=['tree', 'uniform', 'constant-mixture', 'mmd', 'validation'], help="The type of experiment to run")
     parser.add_argument("--optimization-budget", type=str, required=True, choices=['constuntil', 'linear', 'sqrt', 'height', 'constant'], help="The budget function to use at each node")
     parser.add_argument("--optimization-budget-multiplier", type=int, default=1, help="The constant to multiply each optimization budget by")
     parser.add_argument("--optimization-budget-height-cap", type=float, default=np.inf, help="The max height for which opt budget is height-dependent")
@@ -147,7 +152,7 @@ def main():
     parser.add_argument("--eta-decay-mult", type=float, required=False, default=1., help="The amount to multiply eta by after each eta-decay-step steps. If eta-decay-step is 0, then this setting is not used")
     parser.add_argument("--return-best-deepest-node", type=bool, required=True, help="Indicates whether best nodes only at the deepest height (True) or any height (False) should be considered")
     parser.add_argument("--sample-with-replacement", type=bool, default=True, help="Indicates whether best nodes only at the deepest height (True) or any height (False) should be considered")
-    parser.add_argument("--mixture-selection-strategy", type=str, required=True, choices=["delaunay-partitioning", "coordinate-halving", "tree-results", "alpha-star", "uniform", "custom"], help="The mixture selection strategy to use.")
+    parser.add_argument("--mixture-selection-strategy", type=str, required=True, choices=["delaunay-partitioning", "coordinate-halving", "tree-results", "alpha-star", "validation", "uniform", "custom"], help="The mixture selection strategy to use.")
     parser.add_argument("--custom-mixture", type=str, required=False, default="", help="The (comma separated) mixture to use. Only used when mixture-selection-strategy is set to 'custom'")
     parser.add_argument("--columns-to-censor", type=str, default=None, help="The columns to remove from the dataset.")
     parser.add_argument("--output-dir", type=str, required=True, help="The directory in which output files will be placed")
@@ -156,6 +161,7 @@ def main():
     parser.add_argument("--inner-layer-mult", type=float, default=2., help="Determines the number of inner layers of the neural network (unless the dataset id is wine, in which case the network is not configurable).  Num inner layers will be int(inner_layer_mult * input_dim)")
     parser.add_argument("--evaluate-best-result-again", type=bool, default=False, help="If set to True, will evaluate the best node returned by tree search with the same total budget spent so far. Thus, the budget used will be doubled that requested")
     parser.add_argument("--evaluate-best-result-again-eta-mult", type=float, default=1., help="Amount to scale eta by during eval-best-result-again")
+    parser.add_argument("--use-alt-loss-fn", type=bool, default=False, help="A flag to toggle whether default or alt loss function is used")
     # parser.add_argument("--output-filename", type=str, required=True, help="The output filename")
 
     args = parser.parse_args()
@@ -167,9 +173,9 @@ if __name__ == "__main__":
     # sys.argv.extend([
     #     "--dataset-path", "experiment_running/dataset.p",
     #     "--dataset-id", "allstate",
-    #     "--experiment-type", "tree",
-    #     "--optimization-budget", "height",
-    #     "--optimization-budget-multiplier", "881",
+    #     "--experiment-type", "validation",
+    #     "--optimization-budget", "constant",
+    #     "--optimization-budget-multiplier", "1",
     #     "--budget-min", "1000",
     #     "--budget-max", "3000",
     #     "--budget-step", "1000",
@@ -180,8 +186,8 @@ if __name__ == "__main__":
     #     "--eta", "0.0066",
     #     "--return-best-deepest-node", "True",
     #     "--output-dir", "derp",
-    #     "--mixture-selection-strategy", "coordinate-halving",
-    #     "--columns-to-censor", "A_changes,B_changes,C_changes,C_previous,D_changes,E_changes,F_changes,G_changes,age_oldest,age_youngest,car_age,car_value_a,car_value_b,car_value_c,car_value_d,car_value_e,car_value_f,car_value_g,car_value_h,cost_avg,duration_previous,group_size,homeowner,location,married_couple,num_days,num_shopping_pts,risk_factor,time_range_sec",
+    #     "--mixture-selection-strategy", "validation",
+    #     "--columns-to-censor", "",
     #     "--optimization-budget-height-cap", "8"
     # ])
     main()

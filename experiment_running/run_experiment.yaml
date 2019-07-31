@@ -120,7 +120,8 @@ spec:
                 --record-test-error "<RECORD_TEST_ERROR>" \
                 --inner-layer-mult "<INNER_LAYER_MULT>" \
                 --evaluate-best-result-again "<EVALUATE_BEST_RESULT_AGAIN>" \
-                --evaluate-best-result-again-eta-mult "<EVALUATE_BEST_RESULT_AGAIN_ETA_MULT>"
+                --evaluate-best-result-again-eta-mult "<EVALUATE_BEST_RESULT_AGAIN_ETA_MULT>" \
+                --use-alt-loss-fn "<USE_ALT_LOSS_FN>"
         - name: publish-dataset
           image: google/cloud-sdk:latest
           imagePullPolicy: Always

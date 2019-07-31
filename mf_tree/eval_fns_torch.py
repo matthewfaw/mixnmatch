@@ -42,6 +42,12 @@ class ExpMSE(nn.MSELoss):
         in_view = input.view_as(target)
         return super().forward(torch.exp(in_view), torch.exp(target))
 
+class ExpL1(nn.L1Loss):
+
+    def forward(self, input, target):
+        in_view = input.view_as(target)
+        return super().forward(torch.exp(in_view), torch.exp(target))
+
 
 class MFFunction:
     def __init__(self,

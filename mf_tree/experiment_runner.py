@@ -118,7 +118,6 @@ class ExperimentSettings:
                "evaluate best result again:%s\n" \
                "actual budgets:%s\n" \
                "actual mixtures:%s\n" \
-               "actual best sols:%s\n" \
                "record test error:%s\n" % (self.experiment_type,
                                            self.experiment_budgets,
                                            self.return_best_deepest_node,
@@ -144,7 +143,6 @@ class ExperimentSettings:
                                            self.evaluate_best_result_again,
                                            self.actual_budgets,
                                            self.actual_mixtures,
-                                           self.actual_best_sols,
                                            self.record_test_error)
 
 
@@ -258,8 +256,9 @@ class DefaultExperimentConfigurer:
         # Set dataset factories
         if "uniform" == experiment_settings.experiment_type or\
                 "constant-mixture" in experiment_settings.experiment_type or\
+                "validation" in experiment_settings.experiment_type or\
                 "tree" == experiment_settings.experiment_type:
-            data_loader_factory = DataLoaderFactory(df_or_dataset=self.data.train,
+            data_loader_factory = DataLoaderFactory(df_or_dataset=self.data.train if experiment_settings.experiment_type != "validation" else self.data.validate,
                                                     key_to_split_on=self.data.key_to_split_on,
                                                     vals_to_split=self.data.vals_to_split,
                                                     with_replacement=experiment_settings.sample_with_replacement,
@@ -311,6 +310,9 @@ class DefaultExperimentConfigurer:
         elif experiment_settings.mixture_selection_strategy == "alpha-star":
             partitioning_strategy = ConstantPartitioningStrategy(dim=self.alpha_dim,
                                                                  simplex_point=self.alpha_star)
+        elif experiment_settings.mixture_selection_strategy == "validation":
+            partitioning_strategy = ConstantPartitioningStrategy(dim=self.alpha_dim,
+                                                                 simplex_point=self.validate_mixture)
         elif experiment_settings.mixture_selection_strategy == "tree-results":
             partitioning_strategy = []
             for mixtures in experiment_settings.actual_mixtures:
@@ -383,7 +385,7 @@ class ExperimentRunner:
                                 test_dataset=self.common_settings.test_dataset,
                                 test_batch_size=self.test_batch_size,
                                 optimization_strategy=self.opt_strategy,
-                                use_test_error=self.experiment_settings.record_test_error)
+                                use_test_error=False)
         self.root = MFNode(simplex_pts=self.common_settings.initial_simplex,
                            starting_point=starting_point,
                            mf_fn=self.mf_fn,
@@ -443,7 +445,10 @@ class ExperimentRunner:
                                                                       exp_budget=experiment_budget,
                                                                       partitioning_strategy=partitioning_strategy,
                                                                       starting_point=starting_point)
-                val = best_sol.value.item()
+                if self.experiment_settings.record_test_error:
+                    val = best_sol.get_test_error().item()
+                else:
+                    val = best_sol.value.item()
                 print("best_sol_val_iter_{}={}".format(rep, val))
                 vals.append(val)
                 execution_times.append(execution_time.total_seconds())
