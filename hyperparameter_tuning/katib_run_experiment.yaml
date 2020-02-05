@@ -19,7 +19,7 @@ spec:
   optimizationtype: minimize
   objectivevaluename: best_sol_val_avg
   optimizationgoal: <OPT_GOAL>
-  requestcount: 5
+  requestcount: 15
   metricsnames:
     - best_sol_val_iter_1
     - best_sol_val_avg
@@ -38,18 +38,22 @@ spec:
     - best_node_height
     - best_node_value
     - num_inner_layers
+    - auc_roc_ovo_avg
+    - auc_roc_ovo_std
+    - auc_roc_ovr_avg
+    - auc_roc_ovr_std
   parameterconfigs:
     - name: --optimization-budget
       parametertype: categorical
       feasible:
         list:
-          - sqrt
           - constant
     - name: --optimization-budget-multiplier
       parametertype: categorical
       feasible:
         list:
           - "500"
+          - "1000"
     - name: --optimization-budget-height-cap
       parametertype: categorical
       feasible:
@@ -59,23 +63,22 @@ spec:
       parametertype: categorical
       feasible:
         list:
-          - "25"
           - "50"
-          - "100"
     - name: --nu
       parametertype: categorical
       feasible:
         list:
           - "50"
     - name: --rho
-      parametertype: double
+      parametertype: categorical
       feasible:
-        min: "0.7"
-        max: "0.9"
+        list:
+          - "0.7672"
     - name: --eta
       parametertype: categorical
       feasible:
         list:
+          - "0.000002"
           - "0.00002"
           - "0.0002"
           - "0.002"
@@ -84,21 +87,16 @@ spec:
       feasible:
         list:
           - "True"
-          - ""
     - name: --mixture-selection-strategy
       parametertype: categorical
       feasible:
         list:
-          - "coordinate-halving"
           - "delaunay-partitioning"
     - name: --evaluate-best-result-again-eta-mult
       parametertype: categorical
       feasible:
         list:
           - "1.0"
-          - "0.1"
-          - "0.01"
-          - "0.001"
   workerSpec:
     goTemplate:
       rawTemplate: |-
@@ -156,19 +154,22 @@ spec:
                     - sh
                     - -c
                     - |
-                      python -u run_single_experiment.py \
+                      python -u -W once run_single_experiment.py \
                         --dataset-path /transfer/dataset.p \
                         --dataset-id <DATASET_ID> \
                         --tag <TAG> \
                         --actual-budgets-and-mixtures-path "$(ls -d /transfer/* | grep mixtures_and_budgets)" \
                         --experiment-type <EXPERIMENT_TYPE> \
+                        --tree-search-objective "auc_roc_ovo" \
                         --budget-min <BUDGET_MIN> \
                         --budget-max <BUDGET_MAX> \
                         --budget-step <BUDGET_STEP> \
                         --num-repeats <NUM_REPEATS> \
                         --columns-to-censor "<COLUMNS_TO_CENSOR>" \
                         --inner-layer-mult <INNER_LAYER_MULT> \
-                        --evaluate-best-result-again "True" \
+                        --num-hidden-layers 3 \
+                        --inner-layer-size 128 \
+                        --evaluate-best-result-again "" \
                         --use-alt-loss-fn "True" \
                         {{- with .HyperParameters}}
                         {{- range .}}

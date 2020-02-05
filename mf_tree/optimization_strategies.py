@@ -1,5 +1,6 @@
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from sklearn.kernel_approximation import RBFSampler
 
 
 class OptimizationStrategy:
@@ -52,4 +53,19 @@ class SGDTorchOptimizationStrategy(OptimizationStrategy):
             optimizer.step()
             if scheduler is not None:
                 scheduler.step()
+        return model
+
+
+class SGDSklearnOptimizationStrategy(OptimizationStrategy):
+    def __init__(self, step_schedule):
+        super().__init__(step_schedule)
+
+    def optimize(self, fn_to_opt, starting_point, data_loader, eta_mult):
+
+        model = starting_point
+
+        for i_batch, (sample_batch, label_batch) in enumerate(data_loader):
+            # Flatten the tensor
+            sample_batch_view = sample_batch.view(sample_batch.shape[0], -1)
+            model.partial_fit(X=sample_batch_view, y=label_batch)
         return model

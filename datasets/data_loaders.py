@@ -7,12 +7,14 @@ from datasets.pandas_dataset import SampledPandasDatasetFactory, MMDPandasDatase
 class DataLoaderFactory:
     def __init__(self,
                  df_or_dataset,
+                 num_vals_for_product,
                  key_to_split_on,
                  vals_to_split,
                  with_replacement,
                  batch_size,
                  is_categorical):
         self.df_or_dataset = df_or_dataset
+        self.num_vals_for_product = num_vals_for_product
         self.key_to_split_on = key_to_split_on
         self.vals_to_split = vals_to_split
         self.with_replacement = with_replacement
@@ -46,7 +48,6 @@ class DataLoaderFactory:
         else:
             return None
 
-
     def get_data_loader(self, mixture, opt_budget):
         if isinstance(self.df_or_dataset, Dataset):
             mix_tensor = torch.Tensor(mixture)
@@ -71,9 +72,11 @@ class DataLoaderFactory:
             print("Cannot support creating dataloader for dataset of type",type(self.df_or_dataset))
             assert False
 
+
 class MMDDataLoaderFactory(DataLoaderFactory):
     def __init__(self,
                  df_or_dataset,
+                 num_vals_for_product,
                  validation_data,
                  kernel_fn,
                  key_to_split_on,
@@ -86,6 +89,7 @@ class MMDDataLoaderFactory(DataLoaderFactory):
         self.kernel_fn = kernel_fn
         super().__init__(
             df_or_dataset=df_or_dataset,
+            num_vals_for_product=num_vals_for_product,
             key_to_split_on=key_to_split_on,
             vals_to_split=vals_to_split,
             with_replacement=with_replacement,

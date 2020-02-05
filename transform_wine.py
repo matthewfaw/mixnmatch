@@ -1,4 +1,4 @@
-import argparse, os
+import argparse, os, sys
 import pandas as pd
 import numpy as np
 
@@ -21,7 +21,7 @@ def collapse_countries(df):
     countries = ['Argentina', 'Australia', 'Austria', 'Bulgaria', 'Canada',
                  'Chile', 'France', 'Germany', 'Greece', 'Hungary', 'Israel', 'Italy',
                  'New Zealand', 'Portugal', 'Romania', 'South Africa', 'Spain', 'Turkey',
-                 'US', 'Uruguay']
+                 'US', 'Uruguay', 'Other']
     df['country'] = np.NaN
     for country in countries:
         df.loc[df[country] == 1, 'country'] = country
@@ -32,10 +32,7 @@ def collapse_countries(df):
 def add_price_quantiles(df):
     print("Adding price quantiles")
     prices = df['price']
-    df['price_quartile_1'] = [1.0 if p <= 17 else 0.0 for p in prices]
-    df['price_quartile_2'] = [1.0 if 17 < p <= 25 else 0.0 for p in prices]
-    df['price_quartile_3'] = [1.0 if 25 < p <= 42 else 0.0 for p in prices]
-    df['price_quartile_4'] = [1.0 if p > 42 else 0.0 for p in prices]
+    df['price_quartile'] = ["q1" if p <= 17 else ("q2" if p <= 25 else ("q3" if p <= 42 else "q4")) for p in prices]
     return df
 
 
@@ -61,7 +58,12 @@ def transform(args):
     print("Combining datasets")
     df = pd.concat((df_train, df_validate, df_test))
 
-    df_transformed = collapse_countries(log_transform_price(add_price_quantiles(df)))
+    df_transformed = log_transform_price(add_price_quantiles(df))
+    if args.mode == "collapse-countries":
+        print("Determined that countries should be collapsed:")
+        df_transformed = collapse_countries(df_transformed)
+    else:
+        print("{} is not a valid mode... Skipping".format(args.mode))
 
     print("Transformed columns:")
     print(df_transformed.columns)
@@ -75,6 +77,7 @@ def main():
     parser = argparse.ArgumentParser(description="Process the dataset")
     parser.add_argument("--dataset-path", type=str, required=True, help="path to CSV to process")
     parser.add_argument("--dataset-id", type=str, required=True, choices=['wine'], help="the dataset identifier to process")
+    parser.add_argument("--mode", type=str, default="", choices=["", "collapse-countries"], help="The mode determining whether or not to collapse one-hot encoded countries into a single column")
     parser.add_argument("--output-dir", type=str, required=True, help="The directory in which output files will be placed")
     parser.add_argument("--output-file", type=str, required=True, help="File to write the output to")
 
@@ -84,4 +87,10 @@ def main():
 
 
 if __name__ == "__main__":
+    # sys.argv.extend([
+    #     "--dataset-path", "derp/train.csv",
+    #     "--dataset-id", "allstate",
+    #     "--output-dir", "outderp",
+    #     "--output-file", "derp"
+    # ])
     main()

@@ -1,5 +1,5 @@
 def label = "slave-${UUID.randomUUID().toString()}"
-def project = "<YOUR_GCLOUD_PROJECT_ID_HERE>"
+def project = "mcts-models-241403"
 def commit = ""
 
 podTemplate(label: label, yaml:"""

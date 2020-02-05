@@ -14,12 +14,15 @@ class PandasData:
                  is_categorical,
                  key_to_split_on,
                  vals_to_split,
+                 col_to_filter,
+                 vals_to_keep_in_filtered_col,
                  breakdown,
                  cols_to_drop):
-        self.df = pd.read_csv(csv_file)
+        self.df = self._load_df(csv_file, key_to_split_on, product_key_to_keep)
+        self.df[key_to_split_on] = self.df[key_to_split_on].apply(str)
         self.orig_df = deepcopy(self.df)
         self.cols_to_drop = cols_to_drop
-        print("Dropping columns %s"% self.cols_to_drop)
+        print("Dropping columns %s" % self.cols_to_drop)
         self.df.drop(columns=[col for col in self.df.columns
                               for bad in self.cols_to_drop if bad == col],
                      inplace=True)
@@ -37,11 +40,19 @@ class PandasData:
         self.df = self.df.loc[self.df[self.key_to_split_on].isin(breakdown.keys())]
         self.df.fillna(self.df.mean(), inplace=True)
 
+        self.col_to_filter = col_to_filter
+        self.vals_to_keep_in_filtered_col = vals_to_keep_in_filtered_col
+        if self.col_to_filter in self.df.columns:
+            print("Filtering column: {} to contain only values: {}".format(self.col_to_filter, self.vals_to_keep_in_filtered_col))
+            self.df = self.df.loc[self.df[self.col_to_filter].isin(self.vals_to_keep_in_filtered_col)]
+        else:
+            print("Determined the col_to_filter: {} to not be in the df columns, so not filtering a column.".format(self.col_to_filter))
+
         self.is_categorical = is_categorical
         if is_categorical:
-            print("Determined the dataset not be categorical, so mapping original vals to index vals")
+            print("Determined the dataset to be categorical, so mapping original vals to index vals")
             self.unique_label_vals = sorted(self.df[product_key_to_keep].unique())
-            print("Mapping",self.unique_label_vals,"in",product_key_to_keep, "col to the corresponding index value")
+            print("Mapping", self.unique_label_vals,"in",product_key_to_keep, "col to the corresponding index value")
             self.df[product_key_to_keep] = self.df[product_key_to_keep].apply(lambda val: self.unique_label_vals.index(val))
         else:
             print("Determined the dataset to be categorical, so skipping target val mapping step")
@@ -52,12 +63,15 @@ class PandasData:
         for key, info in breakdown.items():
             df_for_key = self.df.loc[self.df[key_to_split_on] == key]
             if info['setting'] == "percents":
-                train_size = info["train"]
+                orig_train_size = info["train"]
                 drop_size = info["drop"]
-                not_train_size = 1. - train_size - drop_size
-                validate_size = info["validate"] / not_train_size if not_train_size != 0. else 0.
-                test_size = 1. - validate_size
+                val_test_size = 1. - orig_train_size - drop_size
 
+                train_size = orig_train_size / (orig_train_size + val_test_size) if orig_train_size != 0. else 0.
+                validate_size = info["validate"] / val_test_size if val_test_size != 0. else 0.
+                test_size = 1. - validate_size if val_test_size != 0. else 0.
+
+                # Discard drop proportion
                 if drop_size == 0.0:
                     curr_data, _ = df_for_key, None
                 elif drop_size == 1.0:
@@ -65,18 +79,23 @@ class PandasData:
                 else:
                     curr_data, _ = train_test_split(df_for_key, train_size=(1.-drop_size))
 
+                # Obtain train set and not train set
                 if train_size == 0.0:
                     train, not_train = None, curr_data
                 elif train_size == 1.0:
                     train, not_train = curr_data, None
                 else:
                     train, not_train = train_test_split(curr_data, train_size=train_size)
+
+                # Obtain valiate and test set
                 if validate_size == 0.0:
                     validate, test = None, not_train
                 elif test_size == 0.0:
                     validate, test = not_train, None
                 else:
                     validate, test = train_test_split(not_train, train_size=validate_size)
+
+                # Add these results to the rest
                 if train is not None:
                     self.train = pd.concat((self.train, train))
                 if validate is not None:
@@ -91,8 +110,32 @@ class PandasData:
         self.test_mixture = self.test[key_to_split_on].value_counts(normalize=True)[vals_to_split].dropna().to_numpy()
         print("Test mixture:", self.test_mixture)
 
+    def _load_df(self, csv_file, key_to_split_on, product_key_to_keep):
+        return pd.read_csv(csv_file)
+
     def get_num_labels(self):
         return len(self.df[self.product_key_to_keep].unique())
+
+
+class SparseOHEPandasData(PandasData):
+    def _load_df(self, csv_file, key_to_split_on, product_key_to_keep):
+        df = pd.read_csv(csv_file, dtype=np.str)
+        print("OHE columns")
+        # df = pd.get_dummies(df, sparse=True, columns=df.columns.difference({key_to_split_on, product_key_to_keep}))
+        df = pd.get_dummies(df, columns=df.columns.difference({key_to_split_on, product_key_to_keep}))
+        print("Combine rare features")
+        # rare_col = 'rare_feats_is_true'
+        # df[rare_col] = 0
+        cols_to_drop = []
+        # for col in df.columns.difference({key_to_split_on, product_key_to_keep, rare_col}):
+        for col in df.columns.difference({key_to_split_on, product_key_to_keep}):
+            if df[col].value_counts()[1] < 50:
+                # df[rare_col] |= df[col]
+                cols_to_drop.append(col)
+        print("Dropping {} rare cols".format(len(cols_to_drop)))
+        df.drop(columns=cols_to_drop, inplace=True)
+        print("Finished dropping rare cols")
+        return df
 
 
 class PandasDataset(Dataset):

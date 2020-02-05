@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: dataset-transformation-<DATASET_ID>
+  name: dataset-transformation-<DATASET_ID>-<DATE>
 spec:
   backoffLimit: 4
   ttlSecondsAfterFinished: 600
@@ -17,8 +17,6 @@ spec:
           env:
             - name: KAGGLE_CONFIG_DIR
               value: "/certs"
-            - name: KAGGLE_SRC
-              value: "<KAGGLE_SRC>"
           volumeMounts:
             - mountPath: "/certs"
               name: certs
@@ -29,13 +27,15 @@ spec:
             - sh
             - -c
             - |
-              pip install kaggle
-
               cd /transfer
 
-              kaggle <KAGGLE_API_TYPE> download $KAGGLE_SRC
-
-              unzip '*.zip'
+              if [ "<SRC_TYPE>" = "curl" ]; then
+                curl -o /transfer/<DATASET_NAME> "<SRC>/<DATASET_NAME>"
+              elif [ "<SRC_TYPE>" = "kaggle" ]; then
+                pip install kaggle
+                kaggle <KAGGLE_API_TYPE> download <SRC>
+                unzip '*.zip'
+              fi
 
               echo "Current contents:"
               ls -l
@@ -55,8 +55,9 @@ spec:
               echo "derp"
               python -u transform_<DATASET_ID>.py --dataset-path /transfer/<DATASET_NAME> \
                 --dataset-id <DATASET_ID> \
+                --mode "<MODE>" \
                 --output-dir "/output" \
-                --output-file "transformed.csv"
+                --output-file "<TRANSFORMED_CSV>"
         - name: publish-dataset
           image: google/cloud-sdk:latest
           imagePullPolicy: Always

@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+
+ID=amazon
+OPT_GOAL=-1000
+FILE="amazon_ROLE_DEPTNAME_ACTION_117878:1,0,0,0|117941:1,0,0,0|117945:1,0,0,0|117920:1,0,0,0|120663:0,0.3,0.7,0_latest.p"
+BUDGET_MIN=30000
+INNER_LAYER_MULT=2.0
+SIZE=amazon-lr
+
+./katib_experiment.sh ${ID} ${OPT_GOAL} ${FILE} ${BUDGET_MIN} ${INNER_LAYER_MULT} ${SIZE} "lr"

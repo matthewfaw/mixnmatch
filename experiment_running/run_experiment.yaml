@@ -99,6 +99,7 @@ spec:
                 --tag <TAG> \
                 --actual-budgets-and-mixtures-path "$(ls -d /transfer/* | grep mixtures_and_budgets)" \
                 --experiment-type <EXPERIMENT_TYPE> \
+                --tree-search-objective "auc_roc_ovo" \
                 --optimization-budget <OPT_BUDGET> \
                 --optimization-budget-multiplier <OPT_BUDGET_MULTIPLIER> \
                 --optimization-budget-height-cap <OPT_BUDGET_HEIGHT_CAP> \
@@ -107,6 +108,14 @@ spec:
                 --budget-step <BUDGET_STEP> \
                 --num-repeats <NUM_REPEATS> \
                 --batch-size <BATCH_SIZE> \
+                --model-mode "<MODEL_MODE>" \
+                --sklearn-loss "<SKLEARN_LOSS>" \
+                --sklearn-loss-penalty "<SKLEARN_LOSS_PENALTY>" \
+                --sklearn-learning-rate "<SKLEARN_LEARNING_RATE>" \
+                --sklearn-learning-rate-alpha "<SKLEARN_LEARNING_RATE_ALPHA>" \
+                --sklearn-kernel "<SKLEARN_KERNEL>" \
+                --sklearn-kernel-gamma "<SKLEARN_KERNEL_GAMMA>" \
+                --sklearn-kernel-ncomponents "<SKLEARN_KERNEL_NCOMPONENTS>" \
                 --nu <NU> \
                 --rho <RHO> \
                 --eta <ETA> \
@@ -119,6 +128,8 @@ spec:
                 --output-dir "/output" \
                 --record-test-error "<RECORD_TEST_ERROR>" \
                 --inner-layer-mult "<INNER_LAYER_MULT>" \
+                --num-hidden-layers "3" \
+                --inner-layer-size "128" \
                 --evaluate-best-result-again "<EVALUATE_BEST_RESULT_AGAIN>" \
                 --evaluate-best-result-again-eta-mult "<EVALUATE_BEST_RESULT_AGAIN_ETA_MULT>" \
                 --use-alt-loss-fn "<USE_ALT_LOSS_FN>"

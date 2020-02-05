@@ -1,84 +1,69 @@
-import argparse
+import argparse, sys
 import pandas as pd
-import numpy as np
-from datetime import datetime as dt
 
 
 def _flatten(df):
-    print("First, collect dataframe of final customer results")
-    a_g_list = range(ord('A'), ord('G')+1)
-    final_cols_to_keep = [chr(i) for i in a_g_list]
-    final_cols_to_keep.extend(['customer_ID', 'cost'])
+    print("in flatten:")
 
-    df_final_choice = df.loc[df["record_type"] == 1].drop(df.columns.difference(final_cols_to_keep), 1)
+    print("Preprocess some cols")
+    df["risk_factor"] = df["risk_factor"].fillna(-1)
+
+    print("Get df for intermetidate vals")
+    df_intermediate_choices = df.loc[df["record_type"] == 0].copy()
+    df_intermediate_choices["day_first"] = df_intermediate_choices["day"]
+
+    print("Get df for final vals")
+    df_final_choice = df.loc[df['record_type'] == 1].copy()
+    df_final_choice = df_final_choice.drop(["record_type", "time", "location"], 1)
 
     final_cols_renaming = {
-        chr(i) : chr(i) + "_final" for i in a_g_list
+        chr(i) : chr(i) + "_final" for i in range(ord("A"), ord("G")+1)
     }
     final_cols_renaming["cost"] = "cost_final"
     df_final_choice.rename(columns=final_cols_renaming, inplace=True)
 
-    print("Add final cust results as new columns to original df")
-    df = df.set_index('customer_ID').join(df_final_choice.set_index('customer_ID'))
-    df = df.reset_index()
-
-    print("Add a column to keep track of number of datapoints for each cust id")
-    print("We'll sum this to count in the agg step")
-    df["num_shopping_pts"] = np.ones((df.shape[0],)).astype(int)
-    print("Preprocess some cols")
-    df["risk_factor"] = df["risk_factor"].fillna(-1)
-    df["time"] = df["time"].apply(lambda t: dt.strptime(t, "%H:%M"))
-
-    datetime_lambda = lambda ts: (max(ts) - min(ts)).seconds
-    print("aggregate:")
+    print("aggregate intermediate vals:")
     aggregate_ops = {
-        "num_shopping_pts": "sum",
-        "day": np.ptp,
-        "time": datetime_lambda,
-        "state": "first",
-        "location": "first",
-        "group_size": "first",
-        "homeowner": "first",
-        "car_age": "first",
-        "car_value": "first",
-        "risk_factor": "first",
-        "age_oldest": "first",
-        "age_youngest": "first",
-        "married_couple": "first",
-        "C_previous": "first",
-        "duration_previous": "first",
-        "A": np.ptp,
-        "B": np.ptp,
-        "C": np.ptp,
-        "D": np.ptp,
-        "E": np.ptp,
-        "F": np.ptp,
-        "G": np.ptp,
-        "cost": "mean",
-        "A_final": "first",
-        "B_final": "first",
-        "C_final": "first",
-        "D_final": "first",
-        "E_final": "first",
-        "F_final": "first",
-        "G_final": "first",
-        "cost_final": "first",
+        "customer_ID": "first",
+        "day_first": "first",
+        "day": "last",
+        "A": "last",
+        "B": "last",
+        "C": "last",
+        "D": "last",
+        "E": "last",
+        "F": "last",
+        "G": "last",
+        "cost": "last",
     }
-    df = df.groupby(df['customer_ID']).agg(aggregate_ops)
-    print("Rename some of the cols that have been manipulated")
-    df.rename(columns={
-        "day": "num_days",
-        "time": "time_range_sec",
-        "A": "A_changes",
-        "B": "B_changes",
-        "C": "C_changes",
-        "D": "D_changes",
-        "E": "E_changes",
-        "F": "F_changes",
-        "G": "G_changes",
-        "cost": "cost_avg",
+    df_intermediate_choices = df_intermediate_choices.groupby(df_intermediate_choices['customer_ID']).agg(aggregate_ops)
+    df_intermediate_choices.rename(columns={
+        "day_first": "day_first_prev",
+        "day": "day_prev",
+        "A": "A_prev",
+        "B": "B_prev",
+        "C": "C_prev",
+        "D": "D_prev",
+        "E": "E_prev",
+        "F": "F_prev",
+        "G": "G_prev",
+        "cost": "cost_prev",
     }, inplace=True)
-    return df
+
+    print("Join intermediate and final results")
+    df_joined = df_intermediate_choices.set_index('customer_ID').join(df_final_choice.set_index('customer_ID'))
+
+    print("Create some new cols based on intermediate + final features")
+    df_joined["num_days"] = (df_joined["day"] - df_joined["day_first_prev"]) % 7
+    df_joined["final_purchase_date_same"] = (df_joined["day"] == df_joined["day_prev"]).astype(int)
+
+    df_joined["cost_changed"] = (df_joined["cost_final"] != df_joined["cost_prev"]).astype(int)
+    df_joined["cost_delta"] = df_joined["cost_final"] - df_joined["cost_prev"]
+
+    print("Drop some tmp columns")
+    df_joined = df_joined.drop(['day_first_prev', 'day_prev', "cost_prev"], 1)
+
+    return df_joined
 
 
 def _ohe(df):
@@ -100,6 +85,7 @@ def main():
     parser = argparse.ArgumentParser(description="Process the dataset")
     parser.add_argument("--dataset-path", type=str, required=True, help="path to CSV to process")
     parser.add_argument("--dataset-id", type=str, required=True, choices=['allstate'], help="the dataset identifier to process")
+    parser.add_argument("--mode", type=str, default="", choices=[""], help="Currently has no function")
     parser.add_argument("--output-dir", type=str, required=True, help="The directory in which output files will be placed")
     parser.add_argument("--output-file", type=str, required=True, help="File to write the output to")
 
@@ -109,4 +95,10 @@ def main():
 
 
 if __name__ == "__main__":
+    # sys.argv.extend([
+    #     "--dataset-path", "derp/train.csv",
+    #     "--dataset-id", "allstate",
+    #     "--output-dir", "outderp",
+    #     "--output-file", "derp"
+    # ])
     main()

@@ -1,5 +1,6 @@
-import argparse, pickle, sys
-from datasets.pandas_dataset import PandasData
+import argparse, sys
+import dill as pickle
+from datasets.pandas_dataset import PandasData, SparseOHEPandasData
 from datasets.torch_dataset import TorchData
 
 
@@ -30,15 +31,20 @@ def process(args):
                              is_categorical=args.is_categorical,
                              key_to_split_on=args.split_key,
                              vals_to_split=vals_to_split,
+                             col_to_filter=args.col_to_filter,
+                             vals_to_keep_in_filtered_col=args.vals_to_keep_in_filtered_col.split(','),
                              cols_to_drop=args.cols_to_drop.split(','),
                              breakdown=breakdown)
-    elif args.dataset_id in ["MNIST"]:
-        dataset = TorchData(dataset_path=args.dataset_path,
-                            dataset_id=args.dataset_id,
-                            is_categorical=args.is_categorical,
-                            key_to_split_on=args.split_key,
-                            vals_to_split=vals_to_split,
-                            breakdown=breakdown)
+    elif args.dataset_id in ["amazon"]:
+        dataset = SparseOHEPandasData(csv_file=args.dataset_path,
+                                      product_key_to_keep=args.target,
+                                      is_categorical=args.is_categorical,
+                                      key_to_split_on=args.split_key,
+                                      vals_to_split=vals_to_split,
+                                      col_to_filter=args.col_to_filter,
+                                      vals_to_keep_in_filtered_col=args.vals_to_keep_in_filtered_col.split(','),
+                                      cols_to_drop=args.cols_to_drop.split(','),
+                                      breakdown=breakdown)
     else:
         print("Unsupported dataset id",args.dataset_id)
         assert False
@@ -58,11 +64,13 @@ def process(args):
 def main():
     parser = argparse.ArgumentParser(description="Process the dataset")
     parser.add_argument("--dataset-path", type=str, required=True, help="path to CSV to process if pandas dataset. Otherwise, path to location to store the downloaded PyTorch dataset")
-    parser.add_argument("--dataset-id", type=str, required=True, choices=['allstate', 'MNIST', 'wine'], help="the dataset identifier to process")
+    parser.add_argument("--dataset-id", type=str, required=True, choices=['allstate', 'wine', 'amazon'], help="the dataset identifier to process")
     parser.add_argument("--is-categorical", type=bool, required=True, help="indicates whether or not the dataset has categorical targets. If _any_ string is passed to this arg, then this will be true. If an empty string is passed, then it will be false")
     parser.add_argument("--split-key", type=str, required=True, help="Key to split the dataset on")
     parser.add_argument("--target", type=str, required=True, help="Target column name")
     parser.add_argument("--cols-to-drop", type=str, default="", help="Column names to drop")
+    parser.add_argument("--col-to-filter", type=str, default="", help="The column to filter. For example, in the wine experiment, if the split key is country, you can use this setting to filter out only data in particular price quartiles.")
+    parser.add_argument("--vals-to-keep-in-filtered-col", type=str, default="", help="The comma-separated list of values to keep in the filtered column")
     parser.add_argument("--val-train-val-test-drop", type=str, required=True, help="State1:Train,Validate,Test,Drop|... percentage split")
     parser.add_argument("--output-dir", type=str, required=True, help="The directory in which output files will be placed")
     parser.add_argument("--unique-image-tag", type=str, required=True, help="The tag of the image currently being used -- intendent to be the tag that doesn't change")
@@ -74,13 +82,13 @@ def main():
 
 if __name__ == "__main__":
     # sys.argv.extend([
-    #     "--dataset-path","./derp",
-    #     "--dataset-id", 'MNIST',
-    #     "--is-categorical", "",
-    #     "--split-key", "",
-    #     "--target", "",
+    #     "--dataset-path","./dataset_creation/transformed.csv",
+    #     "--dataset-id", 'amazon',
+    #     "--is-categorical", "True",
+    #     "--split-key", "ROLE_DEPTNAME",
+    #     "--target", "ACTION",
     #     "--cols-to-drop", "",
-    #     "--val-train-val-test-drop", "1:5000,1000,742,0|4:842,2500,2500,0|7:3000,3000,265,0",
+    #     "--val-train-val-test-drop", "117878:1,0,0,0|117941:1,0,0,0|117945:1,0,0,0|117920:1,0,0,0|120663:0,0.3,0.7,0",
     #     "--output-dir", "./derp",
     #     "--unique-image-tag", "latest"
     # ])

@@ -34,7 +34,7 @@ class CoordinateHalvingPartitioningStrategy(PartitionStrategy):
         hull = scipy.spatial.ConvexHull(face)
         dim_to_split = np.random.randint(face.shape[1])
         dir = np.zeros(face.shape[1])
-        small_mult = 0.001
+        small_mult = 0.000001
         dir[dim_to_split] = 1
         ## Define the new inequality of form [a, b] which is used as an inequality a^T x + b <= 0
         new_eqn = np.zeros(face.shape[1] + 1)

@@ -31,6 +31,12 @@ KATIB_EXTENSION=$7
 if [[ -z "$KATIB_EXTENSION" ]]; then
     TO_APPEND=""
     EXPERIMENT_TYPE=tree
+elif [[ "$KATIB_EXTENSION" == "svm" ]]; then
+  TO_APPEND="_svm"
+  EXPERIMENT_TYPE=tree
+elif [[ "$KATIB_EXTENSION" == "lr" ]]; then
+  TO_APPEND="_lr"
+  EXPERIMENT_TYPE=tree
 else
     TO_APPEND="_${KATIB_EXTENSION}"
     EXPERIMENT_TYPE="$KATIB_EXTENSION"

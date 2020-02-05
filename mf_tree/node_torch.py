@@ -14,6 +14,7 @@ class MFNode:
                  simplex_pts,
                  starting_point,
                  mf_fn: MFFunction,
+                 tree_search_objective,
                  partitioning_strategy,
                  nu,
                  rho,
@@ -24,6 +25,7 @@ class MFNode:
         self.simplex_pts = simplex_pts
         self.starting_point = deepcopy(starting_point)
         self.mf_fn = mf_fn
+        self.tree_search_objective = tree_search_objective
         self.partitioning_strategy = partitioning_strategy
         self.parent = parent
         self.mixture = partitioning_strategy.get_centroid(simplex_pts)
@@ -33,6 +35,7 @@ class MFNode:
         self.opt_budget_fn = opt_budget_fn
         self.opt_budget = -1
         self.execution_time = -1
+        self.validation_mf_fn_res = None
 
         self.value = np.inf
         self.final_model = None
@@ -78,10 +81,21 @@ class MFNode:
     def _evaluate(self, eval_number, starting_point, opt_budget, eta_mult=1.):
         start = dt.now()
         self.eval_number = eval_number
-        self.value, self.final_model = self.mf_fn.fn(starting_point,
-                                                     self.mixture,
-                                                     opt_budget,
-                                                     eta_mult)
+        self.validation_mf_fn_res, self.final_model = self.mf_fn.fn(starting_point,
+                                                                    self.mixture,
+                                                                    opt_budget,
+                                                                    eta_mult)
+        if self.tree_search_objective == "error":
+            self.value = self.validation_mf_fn_res.error
+        elif self.tree_search_objective == "auc_roc_ovo":
+            self.value = - self.validation_mf_fn_res.auc_roc_ovo
+        elif self.tree_search_objective == "min_precision":
+            self.value = - min(self.validation_mf_fn_res.precision)
+        elif self.tree_search_objective == "min_recall":
+            self.value = - min(self.validation_mf_fn_res.recall)
+        else:
+            print("ERROR: Tree search objective {} is invalid. Cannot proceed".format(self.tree_search_objective))
+            assert False
         end = dt.now()
         self.execution_time = end - start
         return self.value
@@ -99,6 +113,7 @@ class MFNode:
             child = MFNode(simplex_pts=child_simplex_points,
                            starting_point=self.final_model,
                            mf_fn=self.mf_fn,
+                           tree_search_objective=self.tree_search_objective,
                            partitioning_strategy=self.partitioning_strategy,
                            nu=self.nu,
                            rho=self.rho,

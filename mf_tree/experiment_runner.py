@@ -4,7 +4,7 @@ from mf_tree.tree_evaluator import DOOTreeEvaluator, ExtendedRunsDOOTreeEvaluato
 from datasets.pandas_dataset import PandasData, PandasDataset
 from datasets.torch_dataset import TorchData, TorchDataset
 from datasets.data_loaders import DataLoaderFactory, MMDDataLoaderFactory
-from mf_tree.optimization_strategies import SGDTorchOptimizationStrategy
+from mf_tree.optimization_strategies import SGDTorchOptimizationStrategy, SGDSklearnOptimizationStrategy
 from mf_tree.optimization_budgets import ConstantBudgetFn, SqrtBudgetFn, LinearBudgetFn, HeightDependentBudgetFn, ConstUntilHeightBudgetFn
 from mf_tree.step_schedules import SimpleTorchStepSchedule
 from mf_tree.simplex_partitioning_strategies import DelaunayPartitioningStrategy, ConstantPartitioningStrategy, CoordinateHalvingPartitioningStrategy
@@ -14,7 +14,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from datetime import datetime as dt
-import pickle
+import dill as pickle
 
 
 class CommonSettings:
@@ -34,6 +34,7 @@ class CommonSettings:
 class ExperimentSettings:
     def __init__(self,
                  experiment_type,
+                 tree_search_objective,
                  experiment_budgets,
                  return_best_deepest_node,
                  sample_with_replacement,
@@ -61,8 +62,11 @@ class ExperimentSettings:
                  actual_budgets,
                  actual_mixtures,
                  actual_best_sols,
-                 record_test_error):
+                 record_test_error,
+                 kernel,
+                 model_mode):
         self.experiment_type=experiment_type
+        self.tree_search_objective=tree_search_objective
         self.experiment_budgets=experiment_budgets
         self.return_best_deepest_node=return_best_deepest_node
         self.sample_with_replacement=sample_with_replacement
@@ -91,9 +95,12 @@ class ExperimentSettings:
         self.actual_mixtures = actual_mixtures
         self.actual_best_sols = actual_best_sols
         self.record_test_error = record_test_error
+        self.kernel = kernel
+        self.model_mode = model_mode
 
     def __repr__(self):
         return "Experiment type:%s\n" \
+               "Tree search objective:%s\n" \
                "Experiment budgets:%s\n" \
                "Return best deepest node:%s\n" \
                "Sample with replacement:%s\n" \
@@ -118,39 +125,42 @@ class ExperimentSettings:
                "evaluate best result again:%s\n" \
                "actual budgets:%s\n" \
                "actual mixtures:%s\n" \
-               "record test error:%s\n" % (self.experiment_type,
-                                           self.experiment_budgets,
-                                           self.return_best_deepest_node,
-                                           self.sample_with_replacement,
-                                           self.optimization_budget_type,
-                                           self.optimization_budgets,
-                                           self.optimization_budget_multiplier,
-                                           self.optimization_budget_height_cap,
-                                           self.loss_fn,
-                                           self.validation_fn,
-                                           self.test_fn,
-                                           self.starting_point,
-                                           self.n_repeats,
-                                           self.nu,
-                                           self.rho,
-                                           self.eta,
-                                           self.eta_decay_step,
-                                           self.eta_decay_mult,
-                                           self.batch_size,
-                                           self.plot_fmt,
-                                           self.mixture_selection_strategy,
-                                           self.custom_mixture,
-                                           self.evaluate_best_result_again,
-                                           self.actual_budgets,
-                                           self.actual_mixtures,
-                                           self.record_test_error)
+               "record test error:%s\n" \
+               "kernel:%s\n" \
+               "model mode:%s\n" % (self.experiment_type,
+                                    self.tree_search_objective,
+                                    self.experiment_budgets,
+                                    self.return_best_deepest_node,
+                                    self.sample_with_replacement,
+                                    self.optimization_budget_type,
+                                    self.optimization_budgets,
+                                    self.optimization_budget_multiplier,
+                                    self.optimization_budget_height_cap,
+                                    self.loss_fn,
+                                    self.validation_fn,
+                                    self.test_fn,
+                                    self.starting_point,
+                                    self.n_repeats,
+                                    self.nu,
+                                    self.rho,
+                                    self.eta,
+                                    self.eta_decay_step,
+                                    self.eta_decay_mult,
+                                    self.batch_size,
+                                    self.plot_fmt,
+                                    self.mixture_selection_strategy,
+                                    self.custom_mixture,
+                                    self.evaluate_best_result_again,
+                                    self.actual_budgets,
+                                    self.actual_mixtures,
+                                    self.record_test_error,
+                                    self.kernel,
+                                    self.model_mode)
 
 
 class RepeatedExperimentResults:
     def __init__(self):
-        self.vals_all = []
-        self.vals_avg = []
-        self.vals_std = []
+        self.mf_fn_results_all = []
         self.execution_times_avg = []
         self.execution_times_std = []
         self.actual_costs_all = []
@@ -160,14 +170,12 @@ class RepeatedExperimentResults:
         self.test_errors_avg = []
         self.test_errors_std = []
 
-    def append(self, vals, execution_times, best_sols, final_mixtures, l1_dists, total_costs, test_errors=None):
-        self.vals_all.append(vals)
+    def append(self, vals, mf_fn_results, execution_times, best_sols, final_mixtures, l1_dists, total_costs, test_errors=None):
         val_avg = np.average(vals)
-        self.vals_avg.append(val_avg)
         print("best_sol_val_avg={}".format(val_avg))
         val_std = np.std(vals)
         print("best_sol_val_std={}".format(val_std))
-        self.vals_std.append(val_std)
+        self.mf_fn_results_all.append(mf_fn_results)
         avg_execution_time = np.average(execution_times)
         self.execution_times_avg.append(avg_execution_time)
         print("execution_time_avg={}".format(avg_execution_time))
@@ -182,6 +190,11 @@ class RepeatedExperimentResults:
         self.l1_dists_all.append(l1_dists)
         print("l1_dist_avg={}".format(np.average(l1_dists)))
         print("l1_dist_std={}".format(np.std(l1_dists)))
+        if mf_fn_results is not None and len(mf_fn_results) > 0 and mf_fn_results[0].auc_roc_ovo is not None:
+            print("auc_roc_ovo_avg={}".format(np.average([mf_fn_res.auc_roc_ovo for mf_fn_res in mf_fn_results])))
+            print("auc_roc_ovo_std={}".format(np.std([mf_fn_res.auc_roc_ovo for mf_fn_res in mf_fn_results])))
+            print("auc_roc_ovr_avg={}".format(np.average([mf_fn_res.auc_roc_ovr for mf_fn_res in mf_fn_results])))
+            print("auc_roc_ovr_std={}".format(np.std([mf_fn_res.auc_roc_ovr for mf_fn_res in mf_fn_results])))
         if test_errors is not None and len(test_errors) > 0:
             avg_test_err = np.average(test_errors)
             std_test_err = np.std(test_errors)
@@ -192,7 +205,7 @@ class RepeatedExperimentResults:
 
 
 class DefaultExperimentConfigurer:
-    def __init__(self, data, cols_to_censor, record_test_error):
+    def __init__(self, data, cols_to_censor, record_test_error, train_on_validation):
         self.censorer = DataCensorer(cols_to_censor=cols_to_censor)
         self.data = self.censorer.censor(data)
         self.record_test_error = record_test_error
@@ -224,8 +237,12 @@ class DefaultExperimentConfigurer:
         print("validate mixture:", self.validate_mixture)
         self.test_mixture = self.data.test_mixture
         print("test mixture:", self.test_mixture)
-        if len(self.validate_mixture) == len(self.data.train_mixture):
-            print("Determined that the validate mixture and train mixture have the same dim, so we can determine alpha star.")
+        val_dim_eq_train_dim = len(self.validate_mixture) == len(self.data.train_mixture)
+        print("Determined the validate mixture and train mixture have {} dim and that we {} training on validation set, so we can{} determine alpha star.".format(
+            "the same" if val_dim_eq_train_dim else "different",
+            "are" if train_on_validation else "aren't",
+            "" if val_dim_eq_train_dim or train_on_validation else "not"))
+        if val_dim_eq_train_dim or train_on_validation:
             if self.record_test_error:
                 print("Determined that alpha star should be determined from test dataset")
                 self.alpha_star = self.test_mixture
@@ -233,7 +250,7 @@ class DefaultExperimentConfigurer:
                 print("Determined that alpha star should be determined from validate dataset")
                 self.alpha_star = self.validate_mixture
         else:
-            print("The dimensions of the train and validate mixtures were determined to be different. Thus, cannot determine alpha star. Setting alpha star to uniform over training set:")
+            print("Setting alpha star to be uniform over train sets")
             self.alpha_star = np.ones_like(self.data.train_mixture) / len(self.data.train_mixture)
 
         print("alpha-star:", self.alpha_star)
@@ -259,6 +276,7 @@ class DefaultExperimentConfigurer:
                 "validation" in experiment_settings.experiment_type or\
                 "tree" == experiment_settings.experiment_type:
             data_loader_factory = DataLoaderFactory(df_or_dataset=self.data.train if experiment_settings.experiment_type != "validation" else self.data.validate,
+                                                    num_vals_for_product=self.num_vals_for_product,
                                                     key_to_split_on=self.data.key_to_split_on,
                                                     vals_to_split=self.data.vals_to_split,
                                                     with_replacement=experiment_settings.sample_with_replacement,
@@ -268,6 +286,7 @@ class DefaultExperimentConfigurer:
             kernel_gamma = 1
             rbf_kernel = RBFKernelFn(gamma=kernel_gamma)
             data_loader_factory = MMDDataLoaderFactory(df_or_dataset=self.data.train,
+                                                       num_vals_for_product=self.num_vals_for_product,
                                                        validation_data=self.D_expensive,
                                                        kernel_fn=rbf_kernel,
                                                        key_to_split_on=self.data.key_to_split_on,
@@ -331,9 +350,15 @@ class DefaultExperimentConfigurer:
                                                 nu=experiment_settings.nu,
                                                 rho=experiment_settings.rho,
                                                 lr=experiment_settings.eta)
-        opt_strategy = SGDTorchOptimizationStrategy(step_schedule=step_schedule,
-                                                    decay_step=experiment_settings.eta_decay_step,
-                                                    decay_mult=experiment_settings.eta_decay_mult)
+        if experiment_settings.model_mode == "torch":
+            opt_strategy = SGDTorchOptimizationStrategy(step_schedule=step_schedule,
+                                                        decay_step=experiment_settings.eta_decay_step,
+                                                        decay_mult=experiment_settings.eta_decay_mult)
+        elif experiment_settings.model_mode == "sklearn":
+            opt_strategy = SGDSklearnOptimizationStrategy(step_schedule=step_schedule)
+        else:
+            print("Invalid model mode {}".format(experiment_settings.model_mode))
+            assert False
 
         return ExperimentRunner(data_loader_factory=data_loader_factory,
                                 opt_budget_class=opt_budget_class,
@@ -384,11 +409,11 @@ class ExperimentRunner:
                                 validation_batch_size=self.validation_batch_size,
                                 test_dataset=self.common_settings.test_dataset,
                                 test_batch_size=self.test_batch_size,
-                                optimization_strategy=self.opt_strategy,
-                                use_test_error=False)
+                                optimization_strategy=self.opt_strategy)
         self.root = MFNode(simplex_pts=self.common_settings.initial_simplex,
                            starting_point=starting_point,
                            mf_fn=self.mf_fn,
+                           tree_search_objective=self.experiment_settings.tree_search_objective,
                            nu=self.experiment_settings.nu,
                            rho=self.experiment_settings.rho,
                            partitioning_strategy=partitioning_strategy,
@@ -419,6 +444,7 @@ class ExperimentRunner:
         for budget_id in range(len(self.experiment_settings.optimization_budgets)):
             experiment_budget = self.experiment_settings.experiment_budgets[budget_id]
             vals = []
+            mf_fn_results = []
             execution_times = []
             final_mixtures = []
             l1_dists = []
@@ -446,11 +472,13 @@ class ExperimentRunner:
                                                                       partitioning_strategy=partitioning_strategy,
                                                                       starting_point=starting_point)
                 if self.experiment_settings.record_test_error:
-                    val = best_sol.get_test_error().item()
+                    mf_fn_result = best_sol.get_test_error()
                 else:
-                    val = best_sol.value.item()
+                    mf_fn_result = best_sol.validation_mf_fn_res
+                val = mf_fn_result.error.item()
                 print("best_sol_val_iter_{}={}".format(rep, val))
                 vals.append(val)
+                mf_fn_results.append(mf_fn_result)
                 execution_times.append(execution_time.total_seconds())
                 best_sols.append(best_sol)
                 final_mixtures.append(best_sol.mixture)
@@ -464,6 +492,7 @@ class ExperimentRunner:
                 #     print("test_error={}".format(test_error))
                 #     test_errors.append(test_error)
             repeated_experiment_res.append(vals=vals,
+                                           mf_fn_results=mf_fn_results,
                                            execution_times=execution_times,
                                            best_sols=best_sols,
                                            final_mixtures=final_mixtures,
@@ -508,16 +537,16 @@ class ExperimentManager:
             end = dt.now()
             print("Ending at: %s with duration: %s" % (end, end - start))
 
-    def plot(self):
-        for idx, res in enumerate(self.results):
-            exper_setting = self.experiment_settings_list[idx]
-            avg_costs = np.average(res.actual_costs_all, axis=1)
-            std_costs = np.std(res.actual_costs_all, axis=1)
-            plt.errorbar(avg_costs, res.vals_avg, xerr=std_costs, yerr=res.vals_std, fmt=exper_setting.plot_fmt, label=exper_setting.experiment_type)
-        plt.xlabel("SGD Iteration budget")
-        plt.ylabel("Validation error")
-        plt.title("Size of validation dataset: %s, alpha star: %s" %
-                  (len(self.experiment_configurer.data.validate),
-                   self.experiment_configurer.alpha_star))
-        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.savefig(self.plot_file, bbox_inches='tight')
+    # def plot(self):
+    #     for idx, res in enumerate(self.results):
+    #         exper_setting = self.experiment_settings_list[idx]
+    #         avg_costs = np.average(res.actual_costs_all, axis=1)
+    #         std_costs = np.std(res.actual_costs_all, axis=1)
+    #         plt.errorbar(avg_costs, res.vals_avg, xerr=std_costs, yerr=res.vals_std, fmt=exper_setting.plot_fmt, label=exper_setting.experiment_type)
+    #     plt.xlabel("SGD Iteration budget")
+    #     plt.ylabel("Validation error")
+    #     plt.title("Size of validation dataset: %s, alpha star: %s" %
+    #               (len(self.experiment_configurer.data.validate),
+    #                self.experiment_configurer.alpha_star))
+    #     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    #     plt.savefig(self.plot_file, bbox_inches='tight')

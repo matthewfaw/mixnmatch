@@ -1,10 +1,3 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: transformed-mnist-cm
-data:
-  data: "derp"
----
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -28,6 +21,13 @@ spec:
               readOnly: true
             - mountPath: "/transfer"
               name: transfer
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "1.5"
+              memory: "2.5Gi"
           command:
             - sh
             - -c
@@ -37,7 +37,7 @@ spec:
               if [ -z "<DOWNLOAD_TRANSFORMED>" ]; then
                 echo "Determined that we do not need to download the transformed dataset. Doing nothing"
               else
-                gsutil cp "<GCLOUD_DATASET_BUCKET>/<DATASET_ID>/dataset_creation/transformed/transformed.csv" <DATASET_PATH>
+                gsutil cp "<GCLOUD_DATASET_BUCKET>/<DATASET_ID>/dataset_creation/transformed/<TRANSFORMED_CSV>" <DATASET_PATH>
               fi
         - name: process-dataset
           image: gcr.io/<GCLOUD_PROJECT>/main:<TAG>
@@ -47,6 +47,13 @@ spec:
               name: transfer
             - mountPath: "/output"
               name: output
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "1.5"
+              memory: "2.5Gi"
           command:
             - sh
             - -c
@@ -57,6 +64,8 @@ spec:
                 --split-key <SPLIT_KEY> \
                 --target <TARGET> \
                 --cols-to-drop "<COLS_TO_DROP>" \
+                --col-to-filter "<COL_TO_FILTER>" \
+                --vals-to-keep-in-filtered-col "<VALS_TO_KEEP_IN_FILTERED_COL>" \
                 --val-train-val-test-drop "<VAL_TRAIN_VAL_TEST>" \
                 --output-dir "/output" \
                 --unique-image-tag "<TAG>"
@@ -70,6 +79,13 @@ spec:
               readOnly: true
             - mountPath: "/output"
               name: output
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "1.5"
+              memory: "2.5Gi"
           command:
             - sh
             - -c
