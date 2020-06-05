@@ -1,0 +1,9 @@
+papers/
+data/
+
+.DS_Store
+*.pyc
+*.swp
+.ipynb_checkpoints/
+
+.idea/
