@@ -1,6 +1,5 @@
 from copy import deepcopy
 from datasets.pandas_dataset import PandasData
-from datasets.torch_dataset import TorchData
 
 
 class DataCensorer:
@@ -13,10 +12,7 @@ class DataCensorer:
         return df[filtered_cols]
 
     def censor(self, data):
-        if isinstance(data, TorchData):
-            print("Censoring TorchData not supported at this time. Returning the TorchData unmodified")
-            return data
-        elif isinstance(data, PandasData):
+        if isinstance(data, PandasData):
             copy = deepcopy(data)
 
             print("Censoring columns:",self.cols_to_censor)

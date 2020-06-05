@@ -2,7 +2,7 @@ cython==0.28.5
 torch==1.1.0
 torchvision==0.3.0
 pandas==0.24.2
--e git://github.com/thomasjpfan/scikit-learn.git@multiclass_roc_auc_3#egg=scikit-learn
+scikit-learn==0.22.2
 numpy==1.17.2
 scipy==1.3.1
 matplotlib==3.1.0

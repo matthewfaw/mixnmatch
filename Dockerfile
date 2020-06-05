@@ -1,4 +1,4 @@
-FROM python:3.7.3
+FROM python:3.7.7
 
 ENV work=/home/mcts_models
 
@@ -11,3 +11,4 @@ COPY *.py ${work}/
 COPY *.sh ${work}/
 COPY datasets/ ${work}/datasets
 COPY mf_tree/ ${work}/mf_tree
+COPY configuration/ ${work}/configuration

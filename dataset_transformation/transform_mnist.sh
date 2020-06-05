@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+SRC_TYPE=None
+KAGGLE_SRC=None
+KAGGLE_API_TYPE=datasets
+DATASET_ID=mnist
+MODE="train:0.1,0.2,0.7|val:0.9|test:0.9"
+DATASET_NAME=""
+TRANSFORMED_FILENAME="transformed"
+
+./transform.sh "$SRC_TYPE" "$KAGGLE_SRC" "$KAGGLE_API_TYPE" "$DATASET_ID" "$MODE" "$DATASET_NAME" "$TRANSFORMED_FILENAME"

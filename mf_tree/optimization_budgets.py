@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Budget:
     def __init__(self, budget, multiplier, height_cap):
         self.budget = budget
@@ -11,9 +12,11 @@ class ConstantBudgetFn(Budget):
     def __call__(self, height, eval_number):
         return self.multiplier * self.budget
 
+
 class SqrtBudgetFn(Budget):
     def __call__(self, height, eval_number):
         return int(self.multiplier * self.budget * np.sqrt(height + 1))
+
 
 class LinearBudgetFn(Budget):
     def __call__(self, height, eval_number):

@@ -25,7 +25,12 @@ SPLIT_KEY=$4
 TARGET=$5
 COLS_TO_DROP=$6
 VAL_TRAIN_VAL_TEST=$7
-TAG=latest
+CURR_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$CURR_BRANCH" = "master" ]]; then
+    TAG=latest
+else
+    TAG="latest-$CURR_BRANCH"
+fi
 SIZE=$8
 TRANSFORMED_CSV=${9:-transformed.csv}
 COL_TO_FILTER=""

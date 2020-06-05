@@ -26,7 +26,8 @@ metadata:
     budget-min: "<BUDGET_MIN>"
     budget-max: "<BUDGET_MAX>"
     budget-step: "<BUDGET_STEP>"
-    inner-layer-mult: "<INNER_LAYER_MULT>"
+    inner-layer-mult: "mult<INNER_LAYER_MULT>"
+    inner-layer-size: "<INNER_LAYER_SIZE>"
     num-repeats: "<NUM_REPEATS>"
     batch-size: "<BATCH_SIZE>"
     nu: "<NU>"
@@ -66,7 +67,7 @@ spec:
             - |
               gcloud auth activate-service-account --key-file=/certs/svc_account.json
 
-              gsutil cp "<GCLOUD_DATASET_BUCKET>/<DATASET_ID>/dataset_creation/created/<DATASET_FILENAME>" /transfer/dataset.p
+              gsutil cp "<GCLOUD_DATASET_BUCKET>/<DATASET_ID>/dataset_creation/<DATASET_CREATION_FOLDER>/<DATASET_FILENAME>" /transfer/dataset.p
               if [ -z "$(cat /mixtures_and_budgets_cm/gcloud_dst)" ]; then
                 echo "Determined that there is no mixtures and budgets to use"
               else
@@ -99,7 +100,7 @@ spec:
                 --tag <TAG> \
                 --actual-budgets-and-mixtures-path "$(ls -d /transfer/* | grep mixtures_and_budgets)" \
                 --experiment-type <EXPERIMENT_TYPE> \
-                --tree-search-objective "auc_roc_ovo" \
+                --tree-search-objective "<TREE_SEARCH_OBJECTIVE>" \
                 --optimization-budget <OPT_BUDGET> \
                 --optimization-budget-multiplier <OPT_BUDGET_MULTIPLIER> \
                 --optimization-budget-height-cap <OPT_BUDGET_HEIGHT_CAP> \
@@ -129,10 +130,13 @@ spec:
                 --record-test-error "<RECORD_TEST_ERROR>" \
                 --inner-layer-mult "<INNER_LAYER_MULT>" \
                 --num-hidden-layers "3" \
-                --inner-layer-size "128" \
+                --inner-layer-size "<INNER_LAYER_SIZE>" \
                 --evaluate-best-result-again "<EVALUATE_BEST_RESULT_AGAIN>" \
                 --evaluate-best-result-again-eta-mult "<EVALUATE_BEST_RESULT_AGAIN_ETA_MULT>" \
-                --use-alt-loss-fn "<USE_ALT_LOSS_FN>"
+                --use-alt-loss-fn "<USE_ALT_LOSS_FN>" \
+                --mmd-rbf-gamma "<MMD_RBF_GAMMA>" \
+                --mmd-rbf-ncomponents "<MMD_RBF_NCOMPONENTS>" \
+                --mmd-representative-set-size "<MMD_REPR_SET_SIZE>"
         - name: publish-dataset
           image: google/cloud-sdk:latest
           imagePullPolicy: Always

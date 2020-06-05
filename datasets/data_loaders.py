@@ -1,7 +1,8 @@
 import torch
 from pandas import DataFrame
+import numpy as np
 from torch.utils.data import Dataset, WeightedRandomSampler, DataLoader
-from datasets.pandas_dataset import SampledPandasDatasetFactory, MMDPandasDatasetFactory, PandasDataset
+from datasets.pandas_dataset import SampledPandasDatasetFactory, MMDPandasDatasetFactory, MixtureIgnoringSampledPandasDatasetFactory
 
 
 class DataLoaderFactory:
@@ -12,7 +13,8 @@ class DataLoaderFactory:
                  vals_to_split,
                  with_replacement,
                  batch_size,
-                 is_categorical):
+                 is_categorical,
+                 importance_weight_column_name):
         self.df_or_dataset = df_or_dataset
         self.num_vals_for_product = num_vals_for_product
         self.key_to_split_on = key_to_split_on
@@ -20,6 +22,7 @@ class DataLoaderFactory:
         self.with_replacement = with_replacement
         self.batch_size = batch_size
         self.is_categorical = is_categorical
+        self.importance_weight_column_name = importance_weight_column_name
         self.dataset_factory = self._get_dataset_factory()
         self.targets = self._get_targets()
 
@@ -29,7 +32,8 @@ class DataLoaderFactory:
                                                key_to_split_on=self.key_to_split_on,
                                                vals_to_split=self.vals_to_split,
                                                with_replacement=self.with_replacement,
-                                               is_categorical=self.is_categorical)
+                                               is_categorical=self.is_categorical,
+                                               importance_weight_column_name=self.importance_weight_column_name)
         else:
             return None
 
@@ -49,20 +53,7 @@ class DataLoaderFactory:
             return None
 
     def get_data_loader(self, mixture, opt_budget):
-        if isinstance(self.df_or_dataset, Dataset):
-            mix_tensor = torch.Tensor(mixture)
-
-            sample_weights = mix_tensor[self.targets]
-            sampler = WeightedRandomSampler(weights=sample_weights,
-                                            num_samples=self.batch_size,
-                                            replacement=self.with_replacement)
-
-            return DataLoader(self.df_or_dataset,
-                              batch_size=self.batch_size,
-                              shuffle=False,
-                              sampler=sampler)
-
-        elif isinstance(self.df_or_dataset, DataFrame):
+        if isinstance(self.df_or_dataset, DataFrame):
             sampled_dataset = self.dataset_factory.get_dataset(mixture, opt_budget)
             return DataLoader(sampled_dataset,
                               batch_size=self.batch_size,
@@ -73,20 +64,54 @@ class DataLoaderFactory:
             assert False
 
 
+class IndividualTrainingSourceDataLoaderFactory(DataLoaderFactory):
+    def get_data_loader(self, mixture_idx, num_training_sources):
+        if isinstance(self.df_or_dataset, DataFrame):
+            mixture = np.eye(1, num_training_sources, mixture_idx)[0]
+            sampled_dataset = self.dataset_factory.get_dataset(mixture=mixture, n_samples=-1)
+            return DataLoader(sampled_dataset,
+                              batch_size=self.batch_size,
+                              shuffle=True)
+
+        else:
+            print("Cannot support creating dataloader for dataset of type",type(self.df_or_dataset))
+            assert False
+
+
+class MixtureIgnoringDataLoaderFactory(DataLoaderFactory):
+    def _get_dataset_factory(self):
+        if isinstance(self.df_or_dataset, DataFrame):
+            return MixtureIgnoringSampledPandasDatasetFactory(df=self.df_or_dataset,
+                                                              key_to_split_on=self.key_to_split_on,
+                                                              vals_to_split=self.vals_to_split,
+                                                              with_replacement=self.with_replacement,
+                                                              is_categorical=self.is_categorical,
+                                                              importance_weight_column_name=self.importance_weight_column_name)
+        else:
+            return None
+
+
 class MMDDataLoaderFactory(DataLoaderFactory):
     def __init__(self,
                  df_or_dataset,
                  num_vals_for_product,
                  validation_data,
-                 kernel_fn,
+                 rbf_gamma,
+                 rbf_ncomponents,
+                 representative_set_size,
                  key_to_split_on,
                  vals_to_split,
+                 product_key_to_keep,
                  with_replacement,
                  batch_size,
-                 is_categorical):
-        assert isinstance(validation_data, PandasDataset)
-        self.validation_df = validation_data.df
-        self.kernel_fn = kernel_fn
+                 is_categorical,
+                 importance_weight_column_name):
+        assert isinstance(validation_data, DataFrame)
+        self.validation_df = validation_data
+        self.rbf_gamma = rbf_gamma
+        self.rbf_ncomponents = rbf_ncomponents
+        self.representative_set_size = representative_set_size
+        self.product_key_to_keep = product_key_to_keep
         super().__init__(
             df_or_dataset=df_or_dataset,
             num_vals_for_product=num_vals_for_product,
@@ -94,17 +119,22 @@ class MMDDataLoaderFactory(DataLoaderFactory):
             vals_to_split=vals_to_split,
             with_replacement=with_replacement,
             batch_size=batch_size,
-            is_categorical=is_categorical)
+            is_categorical=is_categorical,
+            importance_weight_column_name=importance_weight_column_name)
 
     def _get_dataset_factory(self):
         if isinstance(self.df_or_dataset, DataFrame):
             return MMDPandasDatasetFactory(df=self.df_or_dataset,
                                            validation_df=self.validation_df,
-                                           kernel_fn=self.kernel_fn,
+                                           rbf_gamma=self.rbf_gamma,
+                                           rbf_ncomponents=self.rbf_ncomponents,
+                                           representative_set_size=self.representative_set_size,
                                            key_to_split_on=self.key_to_split_on,
                                            vals_to_split=self.vals_to_split,
+                                           product_key_to_keep=self.product_key_to_keep,
                                            with_replacement=self.with_replacement,
-                                           is_categorical=self.is_categorical)
+                                           is_categorical=self.is_categorical,
+                                           importance_weight_column_name=self.importance_weight_column_name)
         elif isinstance(self.df_or_dataset, Dataset):
             #TODO: implement MMD in PyTorch
             print("MMD with PyTorch dataset not yet supported!")

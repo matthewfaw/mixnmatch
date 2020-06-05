@@ -14,7 +14,12 @@ else
     echo "Using Gcloud project: $GCLOUD_DATASET_BUCKET"
 fi
 
-TAG=latest
+CURR_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$CURR_BRANCH" = "master" ]]; then
+    TAG=latest
+else
+    TAG="latest-$CURR_BRANCH"
+fi
 DATASET_ID=$1
 OPT_GOAL=$2
 DATASET_ID_LOWER=$(echo $DATASET_ID | tr '[:upper:]' '[:lower:]')

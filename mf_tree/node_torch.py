@@ -6,6 +6,9 @@ from copy import deepcopy
 from datetime import datetime as dt
 
 from mf_tree.eval_fns_torch import MFFunction
+from functools import partial
+
+from mf_tree.experiment_result_recorder import ExperimentResultRecorder
 
 
 @total_ordering
@@ -15,6 +18,8 @@ class MFNode:
                  starting_point,
                  mf_fn: MFFunction,
                  tree_search_objective,
+                 tree_search_objective_operation,
+                 tree_search_validation_datasource,
                  partitioning_strategy,
                  nu,
                  rho,
@@ -26,6 +31,7 @@ class MFNode:
         self.starting_point = deepcopy(starting_point)
         self.mf_fn = mf_fn
         self.tree_search_objective = tree_search_objective
+        self.tree_search_validation_datasource = tree_search_validation_datasource
         self.partitioning_strategy = partitioning_strategy
         self.parent = parent
         self.mixture = partitioning_strategy.get_centroid(simplex_pts)
@@ -35,7 +41,16 @@ class MFNode:
         self.opt_budget_fn = opt_budget_fn
         self.opt_budget = -1
         self.execution_time = -1
-        self.validation_mf_fn_res = None
+        self.validation_mf_fn_results = None
+
+        self.tree_search_objective_operation_name = tree_search_objective_operation
+        if self.tree_search_objective_operation_name == "max":
+            self.tree_search_objective_operation = lambda l: max(l)
+        elif self.tree_search_objective_operation_name == "max-pairwise-difference":
+            self.tree_search_objective_operation = lambda l: max(l) - min(l)
+        else:
+            print("{} is not a valid tree search objective operation. Cannot continue".format(self.tree_search_objective_operation_name))
+            assert False
 
         self.value = np.inf
         self.final_model = None
@@ -67,32 +82,47 @@ class MFNode:
 
     def get_value_estimate(self):
         return self.value - self.nu * (self.rho ** self.height)
+        # return self.value
 
     def get_worst_case_estimate(self):
         return self.value + self.nu * (self.rho ** self.height)
 
-    def evaluate(self, eval_number):
-        self.opt_budget = self.opt_budget_fn(self.height, self.eval_number)
-        return self._evaluate(eval_number, self.starting_point, self.opt_budget)
+    def evaluate(self, eval_number, num_remaining_iterations, starting_cost, recorder: ExperimentResultRecorder):
+        self.opt_budget = min(self.opt_budget_fn(self.height, self.eval_number), num_remaining_iterations)
+        if self.opt_budget > 0:
+            return self._evaluate(eval_number=eval_number,
+                                  starting_point=self.starting_point,
+                                  opt_budget=self.opt_budget,
+                                  starting_cost=starting_cost,
+                                  recorder=recorder)
+        else:
+            return None
 
-    def evaluate_with_final(self, opt_budget, eta_mult):
-        return self._evaluate(self.eval_number + 1, self.final_model, opt_budget, eta_mult)
+    def evaluate_with_final(self, opt_budget, starting_cost, recorder, eta_mult):
+        return self._evaluate(eval_number=self.eval_number + 1,
+                              starting_point=self.final_model,
+                              opt_budget=opt_budget,
+                              starting_cost=starting_cost,
+                              recorder=recorder,
+                              eta_mult=eta_mult)
 
-    def _evaluate(self, eval_number, starting_point, opt_budget, eta_mult=1.):
+    def _evaluate(self, eval_number, starting_point, opt_budget, starting_cost, recorder: ExperimentResultRecorder, eta_mult=1.):
         start = dt.now()
         self.eval_number = eval_number
-        self.validation_mf_fn_res, self.final_model = self.mf_fn.fn(starting_point,
-                                                                    self.mixture,
-                                                                    opt_budget,
-                                                                    eta_mult)
+        self.validation_mf_fn_results, self.final_model = self.mf_fn.fn(starting_point=starting_point,
+                                                                        mixture=self.mixture,
+                                                                        opt_budget=opt_budget,
+                                                                        starting_cost=starting_cost,
+                                                                        record_fn=partial(recorder.record, node=self),
+                                                                        eta_mult=eta_mult)
         if self.tree_search_objective == "error":
-            self.value = self.validation_mf_fn_res.error
+            self.value = self.tree_search_objective_operation([fn_res.error for fn_res in self.validation_mf_fn_results])
         elif self.tree_search_objective == "auc_roc_ovo":
-            self.value = - self.validation_mf_fn_res.auc_roc_ovo
+            self.value = self.tree_search_objective_operation([-fn_res.auc_roc_ovo for fn_res in self.validation_mf_fn_results])
         elif self.tree_search_objective == "min_precision":
-            self.value = - min(self.validation_mf_fn_res.precision)
+            self.value = self.tree_search_objective_operation([-min(fn_res.precision) for fn_res in self.validation_mf_fn_results])
         elif self.tree_search_objective == "min_recall":
-            self.value = - min(self.validation_mf_fn_res.recall)
+            self.value = self.tree_search_objective_operation([-min(fn_res.recall) for fn_res in self.validation_mf_fn_results])
         else:
             print("ERROR: Tree search objective {} is invalid. Cannot proceed".format(self.tree_search_objective))
             assert False
@@ -114,6 +144,8 @@ class MFNode:
                            starting_point=self.final_model,
                            mf_fn=self.mf_fn,
                            tree_search_objective=self.tree_search_objective,
+                           tree_search_objective_operation=self.tree_search_objective_operation_name,
+                           tree_search_validation_datasource=self.tree_search_validation_datasource,
                            partitioning_strategy=self.partitioning_strategy,
                            nu=self.nu,
                            rho=self.rho,

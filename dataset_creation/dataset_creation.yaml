@@ -58,7 +58,7 @@ spec:
             - sh
             - -c
             - |
-              python -u process.py --dataset-path <DATASET_PATH> \
+              python -u create.py --dataset-path <DATASET_PATH> \
                 --dataset-id <DATASET_ID> \
                 --is-categorical "<IS_CATEGORICAL>" \
                 --split-key <SPLIT_KEY> \

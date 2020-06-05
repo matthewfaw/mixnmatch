@@ -1,0 +1,87 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: <JOB_NAME>
+  labels:
+    app: experiment-running
+    dataset: "<DATASET_ID_LOWER>"
+    post-step: "<POSTPROCESS_STEP>"
+    post-grouping: "<POSTPROCESS_GROUPING>"
+    unique-id: "<UNIQUE_ID>"
+    size: "<SIZE>"
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      imagePullSecrets:
+        - name: docker-creds
+      initContainers:
+        - name: download-dataset
+          image: google/cloud-sdk:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: "/certs"
+              name: gcloud-certs
+              readOnly: true
+            - mountPath: "/transfer"
+              name: transfer
+          command:
+            - sh
+            - -c
+            - |
+              gcloud auth activate-service-account --key-file=/certs/svc_account.json
+
+              gsutil cp "<GCLOUD_DATASET_BUCKET>/<DATASET_ID>/dataset_creation/<DATASET_CREATION_FOLDER>/<DATASET_FILENAME>" "/transfer/<DATASET_FILENAME>"
+        - name: postprocess-dataset
+          image: gcr.io/<GCLOUD_PROJECT>/main:<TAG>
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "2Gi"
+            limits:
+              cpu: "500m"
+              memory: "2.5Gi"
+          volumeMounts:
+            - mountPath: "/transfer"
+              name: transfer
+            - mountPath: "/output"
+              name: output
+          command:
+            - sh
+            - -c
+            - |
+              python -u postprocess.py \
+                --dataset-path "/transfer/<DATASET_FILENAME>" \
+                --dataset-id "<DATASET_ID>" \
+                --tag "<TAG>" \
+                --postprocessing-step "<POSTPROCESS_STEP>" \
+                --max-lr-iters "<MAX_LR_ITERS>" \
+                --output-dir "/output"
+      containers:
+        - name: publish-dataset
+          image: google/cloud-sdk:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: "/certs"
+              name: gcloud-certs
+              readOnly: true
+            - mountPath: "/output"
+              name: output
+          command:
+            - sh
+            - -c
+            - |
+              gcloud auth activate-service-account --key-file=/certs/svc_account.json
+
+              gsutil cp /output/* "<GCLOUD_DATASET_BUCKET>/<DATASET_ID>/dataset_creation/postprocessed/<POSTPROCESS_STEP>/"
+      restartPolicy: Never
+      volumes:
+        - name: gcloud-certs
+          secret:
+            secretName: gcloud-creds
+        - name: transfer
+          emptyDir: {}
+        - name: output
+          emptyDir: {}
